@@ -18,17 +18,17 @@ const char *HOME = "cpsc5300/data";
 const char *EXAMPLE = "example.db";
 const unsigned int BLOCK_SZ = 4096;
 
-void print_statement(hsql::SQLParserResult const *result);
-void print_create(const hsql::CreateStatement *statement);
-void print_select(const hsql::SelectStatement *statement);
-void print_datatype(const hsql::ColumnDefinition::DataType type);
-// default arguments should be in prototype, not definition
-void print_expr(hsql::Expr *expr, std::string end = "");
-void print_table(hsql::TableRef *ref);
+void parse_statement(hsql::SQLParserResult const *result, std::vector<std::string> &tokens);
+void parse_create(const hsql::CreateStatement *statement, std::vector<std::string> &tokens);
+void parse_select(const hsql::SelectStatement *statement, std::vector<std::string> &tokens);
+void parse_datatype(const hsql::ColumnDefinition::DataType type, std::vector<std::string> &tokens, std::string end = "");
+void parse_join_type(const hsql::JoinType type, std::vector<std::string> &tokens);
+void parse_expr(hsql::Expr *expr, std::vector<std::string> &tokens, std::string end = "");
+void parse_table(hsql::TableRef *ref, std::vector<std::string> &tokens);
+void print_tokens(std::vector<std::string> &tokens);
 
 int main(void)
 {
-	// TODO: might want to remove this
 	std::cout << "Have you created a dir: ~/" << HOME << "? (y/n) " << std::endl;
 	std::string ans;
 	getline(std::cin, ans);
@@ -63,16 +63,14 @@ int main(void)
 			hsql::SQLParserResult *result = hsql::SQLParser::parseSQLString(input);
 			if (result->isValid())
 			{
-				print_statement(result);
+				std::vector<std::string> tokens;
+				parse_statement(result, tokens);
+				print_tokens(tokens);
 				delete result;
 			}
 			else
 			{
-				fprintf(stderr, "Given string is not a valid SQL query.\n");
-				fprintf(stderr, "%s (L%d:%d)\n",
-						result->errorMsg(),
-						result->errorLine(),
-						result->errorColumn());
+				std::cout << "Invalid SQL: " << input << "\n";
 				delete result;
 			}
 		}
@@ -83,184 +81,226 @@ int main(void)
 	return EXIT_SUCCESS;
 }
 
-void print_statement(hsql::SQLParserResult const *result)
+void parse_statement(hsql::SQLParserResult const *result, std::vector<std::string> &tokens)
 {
 	const hsql::SQLStatement *statement = static_cast<const hsql::SQLStatement *>(result->getStatement(0));
-
+	printStatementInfo(statement);
 	switch (statement->type())
 	{
 	case hsql::kStmtSelect:
-		print_select((const hsql::SelectStatement *)statement);
+		parse_select((const hsql::SelectStatement *)statement, tokens);
 		break;
 	case hsql::kStmtCreate:
-		print_create((const hsql::CreateStatement *)statement);
+		parse_create((const hsql::CreateStatement *)statement, tokens);
 		break;
 	default:
 		break;
 	}
-	std::cout << "\n";
 	return;
 }
 
-void print_create(const hsql::CreateStatement *statement)
+void parse_create(const hsql::CreateStatement *statement, std::vector<std::string> &tokens)
 {
-	std::cout << "CREATE TABLE " << statement->tableName << " (";
-
+	tokens.push_back("CREATE");
+	tokens.push_back("TABLE");
+	tokens.push_back("(");
 	for (hsql::ColumnDefinition *def : *statement->columns)
 	{
-		std::cout << def->name << " ";
-		print_datatype(def->type);
+		tokens.push_back(def->name);
 		if (def != statement->columns->back())
 		{
-			std::cout << ", ";
+			parse_datatype(def->type, tokens, ",");
+		}
+		else
+		{
+			parse_datatype(def->type, tokens);
 		}
 	}
 
-	std::cout << ")" << std::endl;
+	tokens.push_back(")");
 	return;
 }
 
-void print_select(const hsql::SelectStatement *statement)
+void parse_select(const hsql::SelectStatement *statement, std::vector<std::string> &tokens)
 {
-	hsql::printStatementInfo(statement);
-	std::cout << "SELECT ";
-	// selectList
+	tokens.push_back("SELECT");
 	for (hsql::Expr *expr : *statement->selectList)
 	{
 		if (expr != statement->selectList->back())
 		{
-			print_expr(expr, ",");
+			parse_expr(expr, tokens, ",");
 		}
 		else
 		{
-			print_expr(expr);
+			parse_expr(expr, tokens);
 		}
 	}
-	// fromTable
+
 	if (statement->fromTable)
 	{
-		std::cout << "FROM ";
-		print_table(statement->fromTable);
+		tokens.push_back("FROM");
+		parse_table(statement->fromTable, tokens);
 	}
-	// where clause, search conditions
+
 	if (statement->whereClause)
-	{	
-		std::cout << "WHERE ";
-		print_expr(statement->whereClause);
+	{
+		tokens.push_back("WHERE");
+		parse_expr(statement->whereClause, tokens);
 	}
 	return;
 }
 
-void print_datatype(const hsql::ColumnDefinition::DataType type)
+void parse_datatype(const hsql::ColumnDefinition::DataType type, std::vector<std::string> &tokens, std::string end)
 {
+	std::string result = "";
 	switch (type)
 	{
 	case hsql::ColumnDefinition::DataType::INT:
-		std::cout << "INT";
+		result = "INT";
 		break;
 	case hsql::ColumnDefinition::DataType::DOUBLE:
-		std::cout << "DOUBLE";
+		result = "DOUBLE";
 		break;
 	case hsql::ColumnDefinition::DataType::TEXT:
-		std::cout << "TEXT";
+		result = "TEXT";
 		break;
 	default:
-		std::cout << "UNKNOWN";
+		result = "UNKNOWN";
 		break;
 	}
+	tokens.push_back(result);
+	tokens.back() += end;
 	return;
 }
 
-void print_table(hsql::TableRef *ref)
+void parse_table(hsql::TableRef *ref, std::vector<std::string> &tokens)
 {
 	switch (ref->type)
 	{
 	case hsql::TableRefType::kTableCrossProduct:
+		std::reverse(ref->list->begin(), ref->list->end());
 		for (hsql::TableRef *nex_ref : *ref->list)
 		{
+			std::string token = "";
 			if (nex_ref->alias)
 			{
-				std::cout << nex_ref->name << " AS " << nex_ref->alias;
+				std::string name(nex_ref->name);
+				std::string alias(nex_ref->alias);
+				token += name + " AS " + alias;
 			}
 			else
 			{
-				std::cout << ref->name;
+				std::string name(nex_ref->name);
+				token += name;
 			}
 
 			if (nex_ref != ref->list->back())
 			{
-				std::cout << ", ";
+				token += ",";
 			}
-			else
-			{
-				std::cout << " ";
-			}
+			tokens.push_back(token);
 		}
 		break;
 	case hsql::TableRefType::kTableJoin:
-		std::cout << "LEFT ";
-		print_table(ref->join->left);
-		std::cout << "RIGHT ";
-		print_table(ref->join->right);
-		std::cout << "ON ";	
-		print_expr(ref->join->condition);
+		parse_table(ref->join->left, tokens);
+		parse_join_type(ref->join->type, tokens);
+		parse_table(ref->join->right, tokens);
+		tokens.push_back("ON");
+		parse_expr(ref->join->condition, tokens);
 		break;
 	case hsql::TableRefType::kTableSelect:
-		print_select(ref->select);
+		parse_select(ref->select, tokens);
 	case hsql::TableRefType::kTableName:
 		if (ref->alias)
 		{
-			std::cout << ref->name << " AS " << ref->alias;
+			tokens.push_back(ref->name);
+			tokens.push_back("AS");
+			tokens.push_back(ref->alias);
 		}
 		else
 		{
-			std::cout << ref->name;
+			tokens.push_back(ref->name);
 		}
 	default:
 		break;
 	}
-	std::cout << " ";
 	return;
 }
 
-void print_expr(hsql::Expr *expr, std::string end)
+void parse_expr(hsql::Expr *expr, std::vector<std::string> &tokens, std::string end)
 {
 	switch (expr->type)
 	{
 	case hsql::ExprType::kExprStar:
-		std::cout << "*";
+		tokens.push_back("*");
 		break;
 	case hsql::ExprType::kExprColumnRef:
+	{
+		std::string column = "";
 		if (expr->table)
 		{
-			std::cout << expr->table << "." << expr->name;
+			std::string table(expr->table);
+			std::string name(expr->name);
+			column += table + "." + name;
 		}
 		else
 		{
-			std::cout << expr->name;
+			std::string name(expr->name);
+			column += name;
 		}
+		tokens.push_back(column);
 		break;
+	}
 	case hsql::ExprType::kExprLiteralInt:
-		std::cout << expr->ival;
+		tokens.push_back(std::to_string(expr->ival));
 		break;
 	case hsql::ExprType::kExprOperator:
-		print_expr(expr->expr);
-		std::cout << expr->opChar << " ";
+	{
+		parse_expr(expr->expr, tokens);
+		std::string op(1, expr->opChar);
+		tokens.push_back(op);
 		if (expr->expr2)
 		{
-			print_expr(expr->expr2);
+			parse_expr(expr->expr2, tokens);
 		}
 		else if (expr->exprList)
 		{
 			for (hsql::Expr *e : *expr->exprList)
-				print_expr(e);
+				parse_expr(e, tokens);
 		}
 		break;
+	}
 	default:
-		std::cout << expr->type;
-		std::cout << "?";
+		tokens.push_back("MISSING_TYPE>");
+		tokens.push_back(std::to_string(expr->type));
 		break;
 	}
-	std::cout << end << " ";
+	tokens.back() += end;
 	return;
+}
+
+void parse_join_type(const hsql::JoinType type, std::vector<std::string> &tokens)
+{
+	switch (type)
+	{
+	case hsql::JoinType::kJoinLeft:
+		tokens.push_back("LEFT");
+		break;
+	case hsql::JoinType::kJoinRight:
+		tokens.push_back("RIGHT");
+		break;
+	default:
+		break;
+	}
+	tokens.push_back("JOIN");
+	return;
+}
+
+void print_tokens(std::vector<std::string> &tokens)
+{
+	for (std::string &token : tokens)
+	{
+		std::cout << token << " ";
+	}
+	std::cout << "\n";
 }
