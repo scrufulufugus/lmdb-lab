@@ -75,8 +75,7 @@ int main(void)
 			}
 		}
 	}
-	std::cout << "exited out of program\n"
-			  << std::endl;
+	std::cout << "exited out of program\n";
 
 	return EXIT_SUCCESS;
 }
@@ -84,7 +83,6 @@ int main(void)
 void parse_statement(hsql::SQLParserResult const *result, std::vector<std::string> &tokens)
 {
 	const hsql::SQLStatement *statement = static_cast<const hsql::SQLStatement *>(result->getStatement(0));
-	printStatementInfo(statement);
 	switch (statement->type())
 	{
 	case hsql::kStmtSelect:
