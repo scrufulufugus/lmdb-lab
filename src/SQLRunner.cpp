@@ -2,8 +2,8 @@
 
 // Public
 
-SQLRunner::SQLRunner() { return; };
-SQLRunner::~SQLRunner() { return; };
+SQLRunner::SQLRunner(){};
+SQLRunner::~SQLRunner(){};
 
 void SQLRunner::execute(hsql::SQLParserResult const *result)
 {
