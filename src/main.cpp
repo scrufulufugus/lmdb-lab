@@ -1,6 +1,9 @@
 // Will Alicar
 // CPSC 5300 WQ24
 // Verano - milestone 1
+// --------------------
+// Note: The program searches for folder inside ~/
+// Example Usage: ./sql5300 cpsc5300/data
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,25 +14,17 @@
 #include "SQLParser.h" // parser
 #include "SQLRunner.h"
 
-// This is example code from /usr/local/db6/example
-
-// CREATE A DIRECTORY IN YOUR HOME DIR ~/cpsc5300/data before running this
-const char *HOME = "cpsc5300/data";
-const char *EXAMPLE = "example.db";
-const unsigned int BLOCK_SZ = 4096;
-
-int main(void)
+int main(int argc, char *argv[])
 {
-	std::cout << "Have you created a dir: ~/" << HOME << "? (y/n) " << std::endl;
-	std::string ans;
-	getline(std::cin, ans);
-
-	if (ans != "y")
+	if (argc != 2) {
+		std::cout << "BAD INPUT! USAGE: ./sql5300 <directory>\n";
 		return 1;
-	const char *home = std::getenv("HOME");
-	std::string envdir = std::string(home) + "/" + HOME;
+	}
 
-	// setup DB environment, check docs, pdf page 22
+	const char *home = std::getenv("HOME");
+	std::string envdir = std::string(home) + "/" + argv[1];
+
+	// setup DB environment
 	DbEnv env(0U);
 	env.set_message_stream(&std::cout);
 	env.set_error_stream(&std::cerr);
