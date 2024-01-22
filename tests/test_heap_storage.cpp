@@ -14,4 +14,10 @@ namespace
         Dbt dbt(data, (u_int32_t)(sizeof(data)));
         SlottedPage(dbt, 1);
     }
+
+    TEST(make_heap_file, does_init_work) 
+    {   
+        std::string text = "my_heapfile";
+        HeapFile file(text);
+    }
 }

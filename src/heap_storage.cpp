@@ -1,6 +1,8 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
 
+// PYTHON API DOCS: https://docs.jcea.es/berkeleydb/latest/dbenv.html
+// C++ API DOCS: https://docs.oracle.com/database/bdb181/html/api_reference/CXX/frame_main.html
 // Set global _DB_ENV, probably not here...
 DbEnv *_DB_ENV = nullptr;
 
@@ -170,24 +172,80 @@ void SlottedPage::put_header(RecordID id, u_int16_t size, u_int16_t loc)
 }
 
 //// HeapFile
+// NOTE: Don't need to implement constructor
+
 // public
-void HeapFile::create(void){};
+void HeapFile::create(void){
+    this->db_open(DB_CREATE | DB_EXCL);
+    SlottedPage *block = this->get_new();
+    this->put(block);
+};
 
-void HeapFile::drop(void){};
+void HeapFile::drop(void){
+    this->close();
+    std::remove(this->dbfilename.c_str());
+};
 
-void HeapFile::open(void){};
+void HeapFile::open(void){
+    this->db_open();
+};
 
-void HeapFile::close(void){};
+void HeapFile::close(void){
+    this->db.close(0);
+    this->closed = true;
+};
 
-SlottedPage *HeapFile::get_new(void) { return nullptr; };
+// deallocate me!
+SlottedPage *HeapFile::get_new(void) { 
+    this->last += 1;
+    Dbt block; // does this have to be new?
+    return new SlottedPage(block, this->last, true);
+};
 
-SlottedPage *HeapFile::get(BlockID block_id) { return nullptr; };
+/**
+ * db.get()
+ * If key is an integer then the DB_SET_RECNO flag is automatically set 
+ * for BTree databases and the actual key and the data value are returned as a tuple. 
+ * -- python api, and read the C++ api too.
+*/
+SlottedPage *HeapFile::get(BlockID block_id) { 
+    BlockID* key_data = new BlockID(block_id); // liekly bad
+    Dbt key(key_data, sizeof(BlockID));
+    Dbt data;
+    this->db.get(nullptr, &key, &data, DB_SET_RECNO);
+    return new SlottedPage(data, block_id);
+    delete key_data;
+};
 
-void HeapFile::put(DbBlock *block){};
+// questionable
+void HeapFile::put(DbBlock *block){
+    BlockID* key_data = new BlockID(block->get_block_id());
+    Dbt key(key_data, sizeof(BlockID));
+    this->db.put(nullptr, &key, block->get_block(), 0);
+};
 
-BlockIDs *HeapFile::block_ids() { return nullptr; };
+// deallocate me !
+BlockIDs *HeapFile::block_ids() { 
+    BlockIDs *block_ids = new BlockIDs;
+    for (u_int32_t i = 1; i <= this->last; i++) {
+        block_ids->push_back(i);
+    }
+    return block_ids;
+};
+
 // protected
-void HeapFile::db_open(uint flags){};
+void HeapFile::db_open(uint flags){
+    // might want to consider using C++17 so I can use filesystem
+    const char *home;
+    _DB_ENV->get_home(&home);
+    dbfilename = home + name + ".db";
+    this->db.open(nullptr, dbfilename.c_str(), nullptr, DB_RECNO, flags, 0);
+    void *stats; // deallocate me?
+    this->db.stat(nullptr, stats, 0); // could use DB_FAST_STAT FLAG? check Db:stat() docs
+    last = ((DB_BTREE_STAT*)stats)->bt_ndata;
+    this->closed = false;
+    delete (DB_BTREE_STAT*)stats; // is this ok?
+};
 
 //// HeapTable
 // public
