@@ -25,6 +25,7 @@ SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(bl
     {
         get_header(this->num_records, this->end_free);
     }
+
 };
 
 RecordID SlottedPage::add(const Dbt *data)
@@ -204,12 +205,18 @@ void HeapFile::close(void)
     this->closed = true;
 };
 
-// deallocate me!
+// use profs code
 SlottedPage *HeapFile::get_new(void)
 {
-    this->last += 1;
-    Dbt block; // does this have to be new?
-    return new SlottedPage(block, this->last, true);
+    char block[DbBlock::BLOCK_SZ];
+    memset(block, 0, sizeof(block));
+    Dbt data(block, sizeof(block));
+    int block_id = ++this->last;
+    Dbt key(&block_id, sizeof(block_id));
+    SlottedPage *page = new SlottedPage(data, this->last, true);
+    this->db.put(nullptr, &key, &data, 0); // write it out with initialization applied
+    this->db.get(nullptr, &key, &data, 0);
+    return page;
 };
 
 /**
@@ -398,6 +405,7 @@ Handle HeapTable::append(const ValueDict *row)
     return {record_id, block_id};
 };
 
+// caller responsible for freeing the returned Dbt and its enclosed ret->get_data().
 Dbt *HeapTable::marshal(const ValueDict *row)
 {
     char *bytes = new char[DbBlock::BLOCK_SZ]; // more than we need (we insist that one row fits into DbBlock::BLOCK_SZ)
