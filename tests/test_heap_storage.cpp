@@ -5,7 +5,7 @@
 
 // helper util functions
 Dbt *marshal_text(std::string text);
-std::string unmarshal_text(Dbt *block);
+std::string unmarshal_text(Dbt &block);
 
 namespace
 {
@@ -15,7 +15,7 @@ namespace
     }
 
     // Slotted Page
-    TEST(slotted_page, add_text_data)
+    TEST(slotted_page, test_basics)
     {
         char block[DbBlock::BLOCK_SZ];
         memset(block, 0, sizeof(block));
@@ -24,13 +24,21 @@ namespace
         RecordID id = 0;
         SlottedPage *page = new SlottedPage(data, id, true); // set this to true so page->add wouldn't seg fault
 
+        // adding
         std::string text = "hello";
         Dbt *text_data = marshal_text(text);
         RecordID text_id = page->add(text_data);
-
         Dbt *res_data = page->get(text_id);
-        std::string res = unmarshal_text(res_data);
+        std::string res = unmarshal_text(*res_data);
         ASSERT_EQ(text, res);
+
+        // replacement
+        std::string new_text = "goodbye";
+        Dbt *new_text_data = marshal_text(new_text);
+        page->put(text_id, *new_text_data);
+        Dbt *rep_data = page->get(text_id);
+        std::string rep = unmarshal_text(*rep_data);
+        ASSERT_EQ(new_text, rep);
         delete page;
     }
 
@@ -71,9 +79,12 @@ Dbt *marshal_text(std::string text) {
     return new Dbt(right_size_bytes, offset);
 }
 
-std::string unmarshal_text(Dbt *data) {
-    u_int16_t offset = (u_int16_t)data->get_size();
-    char *bytes = (char *)data->get_data() + sizeof(u_int16_t);
-    std::string text(bytes, offset - sizeof(u_int16_t));
+std::string unmarshal_text(Dbt &data) {
+    u_int16_t offset = (u_int16_t)data.get_size();
+    char *bytes = (char *)data.get_data();
+    u_int16_t size;
+    memcpy(&size, bytes, sizeof(u_int16_t));
+    std::cout << size << std::endl;
+    std::string text(bytes + sizeof(u_int16_t), size);
     return text;
 }

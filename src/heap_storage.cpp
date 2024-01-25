@@ -25,7 +25,6 @@ SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(bl
     {
         get_header(this->num_records, this->end_free);
     }
-
 };
 
 RecordID SlottedPage::add(const Dbt *data)
@@ -53,8 +52,7 @@ Dbt *SlottedPage::get(RecordID record_id)
     {
         return nullptr;
     }
-
-    return new Dbt(this->address(loc), (u_int32_t)size);
+    return new Dbt(this->address(loc), size);
 }
 
 void SlottedPage::put(RecordID record_id, const Dbt &data)
@@ -62,7 +60,7 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
     u_int16_t size;
     u_int16_t loc;
     this->get_header(size, loc, record_id);
-    u_int16_t new_size = (u_int16_t)data.get_size();
+    u_int16_t new_size = data.get_size();
     if (new_size > size)
     {
         u_int16_t extra = new_size - size;
@@ -93,8 +91,9 @@ void SlottedPage::del(RecordID record_id)
 RecordIDs *SlottedPage::ids(void)
 {
     // caller is responsible for cleaning up memory
+    std::cout << this->num_records << std::endl;
     RecordIDs *record_ids = new RecordIDs();
-    for (RecordID id = 0; id < this->num_records; id++)
+    for (RecordID id = 1; id <= this->num_records; id++)
     {
         u_int16_t size;
         u_int16_t loc;
@@ -123,12 +122,27 @@ bool SlottedPage::has_room(u_int16_t size)
 
 void SlottedPage::slide(u_int16_t start, u_int16_t end)
 {
-    u_int16_t shift = end - start;
-    if (shift == 0)
+    if (start == end)
         return;
-
-    // slide data
-    *(u_int16_t *)this->address(this->end_free + 1 + shift) = *(u_int16_t *)this->address(this->end_free + 1);
+    u_int16_t shift;
+    if (start < end)
+    {
+        /**
+         * If start < end, then remove data from offset start up to but not including offset end
+         * by sliding data that is to the left of start to the right.
+         */
+        shift = end - start;
+        memcpy(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), shift);
+    }
+    else
+    {
+        /**
+         * If start > end, then make room for extra data from end to start
+         * by sliding data that is to the left of start to the left.
+         */
+        shift = start - end;
+        memcpy(this->address(this->end_free + 1 - shift), this->address(this->end_free + 1), shift);
+    }
 
     RecordIDs *record_ids = ids();
     for (const RecordID &id : *record_ids)
@@ -136,13 +150,16 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
         u_int16_t size;
         u_int16_t loc;
         this->get_header(size, loc, id);
+
+        std::cout << size << ", " << loc << ", " << id << ", " << std::endl;
         if (loc <= start)
         {
-            loc += shift;
+            loc -= shift;
             this->put_header(id, size, loc);
         }
     }
-    this->end_free += shift;
+    std::cout << "slide pass" << std::endl;
+    this->end_free -= shift;
     this->put_header();
     delete record_ids;
 };
