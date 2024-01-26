@@ -113,11 +113,10 @@ namespace
         env->open(envdir.c_str(), DB_CREATE | DB_INIT_MPOOL, 0);
         _DB_ENV = env;
         
-        // create, put SlottedPage, close it
+        //// create, put SlottedPage, close it
         std::string text = "_my_heapfile";
         HeapFile file(text);
         file.create();
-        file.close();  // The DB handle may not be accessed again after Db::close() is called, regardless of its return. 
 
         BlockIDs *bids = file.block_ids();
         BlockIDs expected_bids = {1};
@@ -127,14 +126,26 @@ namespace
         char block[DbBlock::BLOCK_SZ];
         memset(block, 0, sizeof(block));
         Dbt data(block, sizeof(block));
-        SlottedPage *page = new SlottedPage(data, 1, true);
+        BlockID block_id = 1;
+        SlottedPage *page = new SlottedPage(data, block_id, true);
+        
+        // add data to my page and put it into block
+        std::string value = "hhancock";
+        Dbt *rename_me = marshal_text(value); // rename me
+        RecordID record_id = page->add(rename_me);
         file.put(page);
 
-        // open it again, get block_ids get SlottedPage, drop it
+        file.close();  // The DB handle may not be accessed again after Db::close() is called, regardless of its return. 
+        // open it again, get block_ids, get SlottedPage, drop it
         HeapFile n_file(text);
         n_file.open();
-        n_file.drop();
 
+        SlottedPage *r_page = n_file.get(block_id);
+        Dbt *r_data= page->get(record_id);
+        std::string r_value = unmarshal_text(*r_data);
+        ASSERT_EQ(value, r_value); 
+
+        n_file.drop();
         // clean up
         _DB_ENV->close(0U); // deallocates memory for me
     }

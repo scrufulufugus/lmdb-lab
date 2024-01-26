@@ -264,15 +264,13 @@ SlottedPage *HeapFile::get(BlockID block_id)
     memset(block, 0, sizeof(block));
     Dbt data(block, sizeof(block));
     Dbt key(&block_id, sizeof(BlockID));
-    this->db.get(nullptr, &key, &data, DB_SET_RECNO);
+    this->db.get(nullptr, &key, &data, 0);
     return new SlottedPage(data, block_id);
 };
 
 void HeapFile::put(DbBlock *block)
 {
-    std::cout << "ok" << std::endl;
     BlockID block_id(block->get_block_id());
-    std::cout << block_id << std::endl;
     Dbt key(&block_id, sizeof(BlockID));
     Dbt data(block->get_data(), DbBlock::BLOCK_SZ);
     this->db.put(nullptr, &key, &data, 0);
