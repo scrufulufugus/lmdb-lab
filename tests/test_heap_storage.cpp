@@ -2,6 +2,7 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
 #include <iostream>
+#include <iomanip>
 
 // helper util functions
 Dbt *marshal_text(std::string text);
@@ -59,14 +60,23 @@ namespace
         std::string t4_rv = unmarshal_text(*t4_rd);
         ASSERT_EQ(t4_v, t4_rv);
         t2_rd = page->get(t1_id);
-        std::cout << "was able to get em" << std::endl;
-        t2_rv = unmarshal_text(*t2_rd); // it's "ane" which means jcoltrane overwrote the bytes where "goodbye" was located.
+        t2_rv = unmarshal_text(*t2_rd);
         ASSERT_EQ(t2_v, t2_rv);
 
         // ids
         RecordIDs *rids = page->ids();
         RecordIDs expected_rids = {1,2};
         ASSERT_EQ(*rids, expected_rids);
+
+        // deletion
+        page->del(t1_id);
+        rids = page->ids();
+        expected_rids = {2};
+        ASSERT_EQ(*rids, expected_rids);
+        Dbt *e_rd = page->get(t3_id);
+        std::string e_rv = unmarshal_text(*e_rd);
+        ASSERT_EQ(t4_v, e_rv);
+        delete page;
     }
 
     // Heap File
@@ -103,6 +113,7 @@ Dbt *marshal_text(std::string text) {
     char *right_size_bytes = new char[offset];
     memcpy(right_size_bytes, bytes, offset);
     delete[] bytes;
+    std::cout << text << " " << offset << "<offset::length>" << size << "\n";
     return new Dbt(right_size_bytes, offset);
 }
 

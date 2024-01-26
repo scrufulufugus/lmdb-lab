@@ -102,8 +102,14 @@ void SlottedPage::del(RecordID record_id)
 {
     u_int16_t size;
     u_int16_t loc;
+
+    std::cout << this->end_free+1 << ":endrgre+1\n";
+    // print_mem(this->address(this->end_free+1),1); // 09
     this->get_header(size, loc, record_id);
     this->put_header(record_id, 0, 0);
+    //std::cout << size << ":size, " << loc << ":loc";
+    this->slide(loc, loc + size); // ?
+    //print_mem(this->address(0), DbBlock::BLOCK_SZ);
 }
 
 RecordIDs *SlottedPage::ids(void)
@@ -134,20 +140,29 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
 {
     if (start == end)
         return;
+    
     int shift = end - start;
-    memmove(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), abs(shift));
-    // std::cout << "BEGIN" << start << ":start " << end << ":end " << std::endl;
+    if (shift < 0) { 
+        // means we are sliding data to the left because of addition
+        memmove(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), abs(shift));
+    } else { 
+        // means we are sliding data to the right because of a deletion
+        uint dist = (DbBlock::BLOCK_SZ - shift) - (this->end_free + 1);
+        memmove(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), dist);
+    }
+
+    std::cout << "BEGIN>>> " << start << ":start " << end << ":end " << std::endl;
     RecordIDs *record_ids = ids();
     for (const RecordID &id : *record_ids)
     {
         u_int16_t size;
         u_int16_t loc;
         this->get_header(size, loc, id);
-        //std::cout << size << ":size, " << loc << ":loc, " << id << ":id, " << shift << ":shift" << std::endl;
+        std::cout << size << ":size, " << loc << ":loc, " << id << ":id, " << shift << ":shift" << std::endl;
         if (loc < end)
         {
             loc += shift;
-            //std::cout << "UPDATING -> record_id: " << id << size << ":size, " << loc << ":loc, \n";
+            std::cout << "UPDATING -> " << id << ":record_id, " << size << ":size, " << loc << ":loc, \n";
             this->put_header(id, size, loc);
         }
     }
