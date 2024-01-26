@@ -77,6 +77,15 @@ namespace
         std::string e_rv = unmarshal_text(*e_rd);
         ASSERT_EQ(t4_v, e_rv);
         delete page;
+        delete rids;
+        delete t1_d;
+        delete t1_rd;
+        delete t2_d;
+        delete t2_rd;
+        delete t3_d;
+        delete t3_rd;
+        delete t4_d;
+        delete t4_rd;
     }
 
     // Heap File
