@@ -3,6 +3,8 @@
 #include "storage_engine.h"
 #include <iostream>
 #include <iomanip>
+#include <fstream>
+#include <cstdio>
 
 // helper util functions
 Dbt *marshal_text(std::string text);
@@ -65,7 +67,7 @@ namespace
 
         // ids
         RecordIDs *rids = page->ids();
-        RecordIDs expected_rids = {1,2};
+        RecordIDs expected_rids = {1, 2};
         ASSERT_EQ(*rids, expected_rids);
 
         // deletion
@@ -76,6 +78,8 @@ namespace
         Dbt *e_rd = page->get(t3_id);
         std::string e_rv = unmarshal_text(*e_rd);
         ASSERT_EQ(t4_v, e_rv);
+
+        // fix me?
         delete page;
         delete rids;
         delete t1_d;
@@ -89,10 +93,50 @@ namespace
     }
 
     // Heap File
-    TEST(heap_file, does_init_work)
+    TEST(heap_file, test_basics)
     {
-        std::string text = "my_heapfile";
+        // clean up
+        const char *home = std::getenv("HOME");
+        std::string d_file_name = std::string(home) + "/cpsc5300/data_my_heapfile.db";
+        std::ifstream d_file(d_file_name);
+        if (d_file.is_open())
+        {
+            std::cout << "Deleting previously created dummy file...\n";
+            std::remove(d_file_name.c_str());
+        }
+
+        // init
+        DbEnv *env = new DbEnv(0U);
+        env->set_message_stream(&std::cout);
+        env->set_error_stream(&std::cerr);
+        std::string envdir = std::string(home) + "/cpsc5300/data";
+        env->open(envdir.c_str(), DB_CREATE | DB_INIT_MPOOL, 0);
+        _DB_ENV = env;
+        
+        // create, put SlottedPage, close it
+        std::string text = "_my_heapfile";
         HeapFile file(text);
+        file.create();
+        file.close();  // The DB handle may not be accessed again after Db::close() is called, regardless of its return. 
+
+        BlockIDs *bids = file.block_ids();
+        BlockIDs expected_bids = {1};
+        ASSERT_EQ(*bids, expected_bids);
+
+        // give me new block
+        char block[DbBlock::BLOCK_SZ];
+        memset(block, 0, sizeof(block));
+        Dbt data(block, sizeof(block));
+        SlottedPage *page = new SlottedPage(data, 1, true);
+        file.put(page);
+
+        // open it again, get block_ids get SlottedPage, drop it
+        HeapFile n_file(text);
+        n_file.open();
+        n_file.drop();
+
+        // clean up
+        _DB_ENV->close(0U); // deallocates memory for me
     }
 
     // Heap Table
@@ -109,7 +153,8 @@ namespace
     }
 }
 
-Dbt *marshal_text(std::string text) {
+Dbt *marshal_text(std::string text)
+{
     uint size = text.length();
     uint offset = 0;
 
@@ -126,7 +171,8 @@ Dbt *marshal_text(std::string text) {
     return new Dbt(right_size_bytes, offset);
 }
 
-std::string unmarshal_text(Dbt &data) {
+std::string unmarshal_text(Dbt &data)
+{
     u_int16_t offset = (u_int16_t)data.get_size();
     char *bytes = (char *)data.get_data();
     u_int16_t size;

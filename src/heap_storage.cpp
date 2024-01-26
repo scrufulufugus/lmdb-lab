@@ -22,8 +22,10 @@ void print_mem(const void *data, size_t size)
     std::cout << std::dec << std::endl;
 }
 
-// API DOCS: https://docs.jcea.es/berkeleydb/latest/dbenv.html
-// Set global _DB_ENV, probably not here...
+// PY  DOCS: https://docs.jcea.es/berkeleydb/latest/dbenv.html
+// C++ DOCS: https://docs.oracle.com/database/bdb181/html/api_reference/CXX/frame_main.html
+
+// this will be set by HeapFile
 DbEnv *_DB_ENV = nullptr;
 
 //// SlottedPage
@@ -258,20 +260,22 @@ SlottedPage *HeapFile::get_new(void)
  */
 SlottedPage *HeapFile::get(BlockID block_id)
 {
-    BlockID *key_data = new BlockID(block_id); // likely bad
-    Dbt key(key_data, sizeof(BlockID));
-    Dbt data;
+    char block[DbBlock::BLOCK_SZ];
+    memset(block, 0, sizeof(block));
+    Dbt data(block, sizeof(block));
+    Dbt key(&block_id, sizeof(BlockID));
     this->db.get(nullptr, &key, &data, DB_SET_RECNO);
     return new SlottedPage(data, block_id);
-    delete key_data;
 };
 
-// questionable
 void HeapFile::put(DbBlock *block)
 {
-    BlockID *key_data = new BlockID(block->get_block_id());
-    Dbt key(key_data, sizeof(BlockID));
-    this->db.put(nullptr, &key, block->get_block(), 0);
+    std::cout << "ok" << std::endl;
+    BlockID block_id(block->get_block_id());
+    std::cout << block_id << std::endl;
+    Dbt key(&block_id, sizeof(BlockID));
+    Dbt data(block->get_data(), DbBlock::BLOCK_SZ);
+    this->db.put(nullptr, &key, &data, 0);
 };
 
 // deallocate me !
@@ -288,16 +292,17 @@ BlockIDs *HeapFile::block_ids()
 // protected
 void HeapFile::db_open(uint flags)
 {
-    // might want to consider using C++17 so I can use filesystem
+    if (!this->closed) return;
     const char *home;
     _DB_ENV->get_home(&home);
     dbfilename = home + name + ".db";
+    this->db.set_re_len(DbBlock::BLOCK_SZ);
     this->db.open(nullptr, dbfilename.c_str(), nullptr, DB_RECNO, flags, 0);
-    void *stats;                      // deallocate me?
-    this->db.stat(nullptr, stats, 0); // could use DB_FAST_STAT FLAG? check Db:stat() docs
+    char stats[sizeof(DB_BTREE_STAT)];
+    memset(stats, 0, sizeof(DB_BTREE_STAT));
+    this->db.stat(nullptr, stats, DB_FAST_STAT);
     last = ((DB_BTREE_STAT *)stats)->bt_ndata;
     this->closed = false;
-    delete (DB_BTREE_STAT *)stats; // is this ok?
 };
 
 //// HeapTable
