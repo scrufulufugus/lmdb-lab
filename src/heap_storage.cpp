@@ -1,11 +1,26 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
-
+#include <iomanip> // remove me
 /** NOTES:
  * When you get a block from BerkDB with db->get,
  * you supply a Dbt structure but BerkDB fills it with a pointer to their memory--
  * you don't ever free this memory.
  */
+
+// util function to view the block in a SlottedPage
+void print_mem(const void *data, size_t size)
+{
+    auto *bytes = static_cast<const unsigned char *>(data);
+    for (size_t i = 0; i < size; ++i)
+    {
+        std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)bytes[i];
+        if ((i + 1) % 16 == 0)
+            std::cout << std::endl;
+        else
+            std::cout << " ";
+    }
+    std::cout << std::dec << std::endl;
+}
 
 // API DOCS: https://docs.jcea.es/berkeleydb/latest/dbenv.html
 // Set global _DB_ENV, probably not here...
@@ -47,7 +62,6 @@ Dbt *SlottedPage::get(RecordID record_id)
     u_int16_t size;
     u_int16_t loc;
     this->get_header(size, loc, record_id);
-
     if (loc == 0)
     {
         return nullptr;
@@ -63,17 +77,21 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
     u_int16_t new_size = data.get_size();
     if (new_size > size)
     {
-        u_int16_t extra = new_size - size;
+        int extra = new_size - size;
         if (!this->has_room(extra))
         {
             throw "Not enough room in block";
         }
         this->slide(loc + new_size, loc + size);
-        memcpy(this->address(loc - extra), data.get_data(), new_size);
+        //std::cout << "put, before memmove\n";
+        //print_mem(this->address(0), DbBlock::BLOCK_SZ);
+        memmove(this->address(loc - extra), data.get_data(), new_size);
+        //std::cout << "put, after memmove\n";
+        //print_mem(this->address(0), DbBlock::BLOCK_SZ);
     }
     else
     {
-        memcpy(this->address(loc), data.get_data(), new_size);
+        memmove(this->address(loc), data.get_data(), new_size);
         this->slide(loc + new_size, loc + size);
     }
     this->get_header(size, loc, record_id);
@@ -91,7 +109,6 @@ void SlottedPage::del(RecordID record_id)
 RecordIDs *SlottedPage::ids(void)
 {
     // caller is responsible for cleaning up memory
-    std::cout << this->num_records << std::endl;
     RecordIDs *record_ids = new RecordIDs();
     for (RecordID id = 1; id <= this->num_records; id++)
     {
@@ -107,13 +124,6 @@ RecordIDs *SlottedPage::ids(void)
 }
 
 // protected
-void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id)
-{
-    // headers are 4 bytes in size
-    size = get_n(4 * id);
-    loc = get_n(4 * id + 2);
-};
-
 bool SlottedPage::has_room(u_int16_t size)
 {
     u_int16_t available = this->end_free - (this->num_records + 1) * 4;
@@ -124,42 +134,24 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
 {
     if (start == end)
         return;
-    u_int16_t shift;
-    if (start < end)
-    {
-        /**
-         * If start < end, then remove data from offset start up to but not including offset end
-         * by sliding data that is to the left of start to the right.
-         */
-        shift = end - start;
-        memcpy(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), shift);
-    }
-    else
-    {
-        /**
-         * If start > end, then make room for extra data from end to start
-         * by sliding data that is to the left of start to the left.
-         */
-        shift = start - end;
-        memcpy(this->address(this->end_free + 1 - shift), this->address(this->end_free + 1), shift);
-    }
-
+    int shift = end - start;
+    memmove(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), abs(shift));
+    // std::cout << "BEGIN" << start << ":start " << end << ":end " << std::endl;
     RecordIDs *record_ids = ids();
     for (const RecordID &id : *record_ids)
     {
         u_int16_t size;
         u_int16_t loc;
         this->get_header(size, loc, id);
-
-        std::cout << size << ", " << loc << ", " << id << ", " << std::endl;
-        if (loc <= start)
+        //std::cout << size << ":size, " << loc << ":loc, " << id << ":id, " << shift << ":shift" << std::endl;
+        if (loc < end)
         {
-            loc -= shift;
+            loc += shift;
+            //std::cout << "UPDATING -> record_id: " << id << size << ":size, " << loc << ":loc, \n";
             this->put_header(id, size, loc);
         }
     }
-    std::cout << "slide pass" << std::endl;
-    this->end_free -= shift;
+    this->end_free += shift;
     this->put_header();
     delete record_ids;
 };
@@ -193,6 +185,13 @@ void SlottedPage::put_header(RecordID id, u_int16_t size, u_int16_t loc)
     put_n(4 * id, size);
     put_n(4 * id + 2, loc);
 }
+
+void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id)
+{
+    // headers are 4 bytes in size
+    size = get_n(4 * id);
+    loc = get_n(4 * id + 2);
+};
 
 //// HeapFile
 // NOTE: Don't need to implement constructor

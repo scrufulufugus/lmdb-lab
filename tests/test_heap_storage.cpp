@@ -25,21 +25,48 @@ namespace
         SlottedPage *page = new SlottedPage(data, id, true); // set this to true so page->add wouldn't seg fault
 
         // adding
-        std::string text = "hello";
-        Dbt *text_data = marshal_text(text);
-        RecordID text_id = page->add(text_data);
-        Dbt *res_data = page->get(text_id);
-        std::string res = unmarshal_text(*res_data);
-        ASSERT_EQ(text, res);
+        std::string t1_v = "hello";
+        Dbt *t1_d = marshal_text(t1_v);
+        RecordID t1_id = page->add(t1_d);
+        Dbt *t1_rd = page->get(t1_id);
+        std::string t1_rv = unmarshal_text(*t1_rd);
+        ASSERT_EQ(t1_v, t1_rv);
 
         // replacement
-        std::string new_text = "goodbye";
-        Dbt *new_text_data = marshal_text(new_text);
-        page->put(text_id, *new_text_data);
-        Dbt *rep_data = page->get(text_id);
-        std::string rep = unmarshal_text(*rep_data);
-        ASSERT_EQ(new_text, rep);
-        delete page;
+        std::string t2_v = "goodbye";
+        Dbt *t2_d = marshal_text(t2_v);
+        page->put(t1_id, *t2_d);
+        Dbt *t2_rd = page->get(t1_id);
+        std::string t2_rv = unmarshal_text(*t2_rd);
+        ASSERT_EQ(t2_v, t2_rv);
+
+        // add another
+        std::string t3_v = "mdavis";
+        Dbt *t3_d = marshal_text(t3_v);
+        RecordID t3_id = page->add(t3_d);
+        Dbt *t3_rd = page->get(t3_id);
+        std::string t3_rv = unmarshal_text(*t3_rd);
+        ASSERT_EQ(t3_v, t3_rv);
+        t2_rd = page->get(t1_id);
+        t2_rv = unmarshal_text(*t2_rd);
+        ASSERT_EQ(t2_v, t2_rv);
+
+        // replace again
+        std::string t4_v = "jcoltrane";
+        Dbt *t4_d = marshal_text(t4_v);
+        page->put(t3_id, *t4_d);
+        Dbt *t4_rd = page->get(t3_id);
+        std::string t4_rv = unmarshal_text(*t4_rd);
+        ASSERT_EQ(t4_v, t4_rv);
+        t2_rd = page->get(t1_id);
+        std::cout << "was able to get em" << std::endl;
+        t2_rv = unmarshal_text(*t2_rd); // it's "ane" which means jcoltrane overwrote the bytes where "goodbye" was located.
+        ASSERT_EQ(t2_v, t2_rv);
+
+        // ids
+        RecordIDs *rids = page->ids();
+        RecordIDs expected_rids = {1,2};
+        ASSERT_EQ(*rids, expected_rids);
     }
 
     // Heap File
@@ -84,7 +111,6 @@ std::string unmarshal_text(Dbt &data) {
     char *bytes = (char *)data.get_data();
     u_int16_t size;
     memcpy(&size, bytes, sizeof(u_int16_t));
-    std::cout << size << std::endl;
     std::string text(bytes + sizeof(u_int16_t), size);
     return text;
 }
