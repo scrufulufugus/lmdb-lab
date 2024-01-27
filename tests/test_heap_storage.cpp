@@ -168,27 +168,18 @@ namespace
         column_attributes.push_back(ca);
 
         // start testing
-        std::cout << "creating..." << std::endl;
         HeapTable table1("_test_create_drop_cpp", column_names, column_attributes);
-        std::cout << "table1 created..." << std::endl;
         table1.create();
-        std::cout << "create ok" << std::endl;
         table1.drop(); // drop makes the object unusable because of BerkeleyDB
         // restriction-- maybe want to fix this some day
-        std::cout << "drop ok" << std::endl;
         HeapTable table("_test_data_cpp", column_names, column_attributes);
         table.create_if_not_exists();
-        std::cout << "create_if_not_exsts ok" << std::endl;
         ValueDict row;
         row["a"] = Value(12);
         row["b"] = Value("Hello!");
-        std::cout << "try insert" << std::endl;
         table.insert(&row);
-        std::cout << "insert ok" << std::endl;
         Handles *handles = table.select();
-        std::cout << "select ok " << handles->size() << std::endl;
         ValueDict *result = table.project((*handles)[0]);
-        std::cout << "project ok" << std::endl;
         Value value = (*result)["a"];
         ASSERT_EQ(value.n, 12);
         value = (*result)["b"];
@@ -211,13 +202,11 @@ Dbt *marshal_text(std::string text)
     char *right_size_bytes = new char[offset];
     memcpy(right_size_bytes, bytes, offset);
     delete[] bytes;
-    std::cout << text << " " << offset << "<offset::length>" << size << "\n";
     return new Dbt(right_size_bytes, offset);
 }
 
 std::string unmarshal_text(Dbt &data)
 {
-    u_int16_t offset = (u_int16_t)data.get_size();
     char *bytes = (char *)data.get_data();
     u_int16_t size;
     memcpy(&size, bytes, sizeof(u_int16_t));

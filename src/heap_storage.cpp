@@ -107,9 +107,11 @@ void SlottedPage::del(RecordID record_id)
 {
     u_int16_t size;
     u_int16_t loc;
+
     // print_mem(this->address(this->end_free+1),1); // 09
     this->get_header(size, loc, record_id);
     this->put_header(record_id, 0, 0);
+    // std::cout << size << ":size, " << loc << ":loc";
     this->slide(loc, loc + size); // ?
     // print_mem(this->address(0), DbBlock::BLOCK_SZ);
 }
@@ -144,6 +146,7 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
         return;
 
     int shift = end - start;
+    // std::cout << "shift::" << shift << std::endl;
     if (shift < 0)
     {
         // means we are sliding data to the left because of addition
@@ -227,6 +230,7 @@ void HeapFile::create(void)
 void HeapFile::drop(void)
 {
     this->close();
+    // _DB_ENV->dbremove(nullptr, this->dbfilename.c_str(), nullptr, 0);
     std::remove(this->dbfilename.c_str());
 };
 
@@ -399,26 +403,46 @@ Handles *HeapTable::select(const ValueDict *where)
     return handles;
 }
 
-// not required for Milestone 2
-ValueDict *HeapTable::project(Handle handle) { return nullptr; };
+ValueDict *HeapTable::project(Handle handle)
+{
+    BlockID block_id = handle.first;
+    RecordID record_id = handle.second;
+    SlottedPage *page = this->file.get(block_id);
+    ValueDict *row = unmarshal(page->get(record_id));
+    return row;
+};
 
-// not required for Milestone 2
-ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names) { return nullptr; };
+// not tested
+ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names)
+{
+    BlockID block_id = handle.first;
+    RecordID record_id = handle.second;
+    SlottedPage *page = this->file.get(block_id);
+    ValueDict *rows = unmarshal(page->get(record_id));
+    ValueDict *p_rows = new ValueDict();
+    for (const auto &column_name : *column_names) {
+        if (rows->find(column_name) != rows->end()) {
+            (*p_rows)[column_name] = (*rows)[column_name];
+        }
+    }
+    return p_rows;
+};
 
 // protected
 
 ValueDict *HeapTable::validate(const ValueDict *row)
 {
     ValueDict *full_row = new ValueDict;
-    for (const auto &col : *row)
+    for (const auto &column_name : this->column_names)
     {
-        if (col.first == "INT" || col.first == "TEXT")
+        if (row->find(column_name) == row->end())
         {
-            (*full_row)[col.first] = col.second;
+            throw std::invalid_argument("can't handle this type");
         }
         else
         {
-            throw std::invalid_argument("Can't handle this type: " + col.first);
+            ValueDict::const_iterator item = row->find(column_name);
+            (*full_row)[column_name] = item->second;
         }
     }
     return full_row;
@@ -427,9 +451,9 @@ ValueDict *HeapTable::validate(const ValueDict *row)
 Handle HeapTable::append(const ValueDict *row)
 {
     RecordID record_id;
-    BlockID block_id;
+    BlockID block_id = this->file.get_last_block_id();
     Dbt *data = marshal(row);
-    SlottedPage *block = this->file.get(this->file.get_last_block_id());
+    SlottedPage *block = this->file.get(block_id); // fixed
     try
     {
         record_id = block->add(data);
@@ -473,6 +497,7 @@ Dbt *HeapTable::marshal(const ValueDict *row)
         }
     }
     char *right_size_bytes = new char[offset];
+    //print_mem(bytes, DbBlock::BLOCK_SZ);
     memcpy(right_size_bytes, bytes, offset);
     delete[] bytes;
     Dbt *data = new Dbt(right_size_bytes, offset);
@@ -484,27 +509,28 @@ ValueDict *HeapTable::unmarshal(Dbt *data)
     ValueDict *row = new ValueDict();
     uint offset = 0;
     uint col_num = 0;
+    char *bytes = (char *)data->get_data();
+    //print_mem(bytes, data->get_size());
     for (auto const &column_name : this->column_names)
-    {
+    {   
         ColumnAttribute ca = this->column_attributes[col_num++];
         if (ca.get_data_type() == ColumnAttribute::DataType::INT)
         {
-            char *bytes = (char *)data->get_data() + offset;
-            (*row)[column_name] = *(int32_t *)bytes;
+            (*row)[column_name].n = *(int32_t *)(bytes + offset);
             offset += sizeof(int32_t);
         }
         else if (ca.get_data_type() == ColumnAttribute::DataType::TEXT)
         {
-            char *bytes = (char *)data->get_data() + offset;
             u_int16_t size;
-            memcpy(&size, bytes, sizeof(u_int16_t));
-            std::string text(bytes + sizeof(u_int16_t), size);
-            (*row)[column_name] = text;
-            offset += sizeof(u_int16_t) + size;
+            memcpy(&size, bytes + offset, sizeof(u_int16_t));
+            offset += sizeof(u_int16_t);
+            std::string text(bytes + offset, size);
+            (*row)[column_name].s = text;
+            offset += size;
         }
         else
         {
-            throw DbRelationError("Only know how to marshal INT and TEXT");
+            throw DbRelationError("Only know how to unmarshal INT and TEXT");
         }
     }
     return row;
