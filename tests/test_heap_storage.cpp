@@ -7,6 +7,9 @@
 #include <cstdio>
 #include <cstdlib>
 
+// PY  DOCS: https://docs.jcea.es/berkeleydb/latest/dbenv.html
+// C++ DOCS: https://docs.oracle.com/database/bdb181/html/api_reference/CXX/frame_main.html
+
 // helper util functions
 Dbt *marshal_text(std::string text);
 std::string unmarshal_text(Dbt &block);
@@ -151,6 +154,11 @@ namespace
         ASSERT_EQ(value, r_value);
 
         n_file.drop();
+
+        // clean up
+        delete bids;
+        delete page;
+        delete r_page;
     }
 
     TEST_F(HeapFixture, heap_table_basics)
@@ -185,6 +193,10 @@ namespace
         value = (*result)["b"];
         ASSERT_EQ(value.s, "Hello!");
         table.drop();
+
+        // clean up
+        delete handles;
+        delete result;
     }
 }
 
