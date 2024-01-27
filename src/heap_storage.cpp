@@ -1,11 +1,7 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
-#include <iomanip> // remove me
-/** NOTES:
- * When you get a block from BerkDB with db->get,
- * you supply a Dbt structure but BerkDB fills it with a pointer to their memory--
- * you don't ever free this memory.
- */
+#include <iomanip>
+// When you get a block from BerkDB with db->get, you don't ever free this memory.
 
 // util function to view the block in a SlottedPage
 void print_mem(const void *data, size_t size)
@@ -22,10 +18,6 @@ void print_mem(const void *data, size_t size)
     std::cout << std::dec << std::endl;
 }
 
-// PY  DOCS: https://docs.jcea.es/berkeleydb/latest/dbenv.html
-// C++ DOCS: https://docs.oracle.com/database/bdb181/html/api_reference/CXX/frame_main.html
-
-// this will be set by HeapFile
 DbEnv *_DB_ENV = nullptr;
 
 //// SlottedPage
@@ -58,7 +50,6 @@ RecordID SlottedPage::add(const Dbt *data)
     return id;
 }
 
-// don't forget to delete data after calling get
 Dbt *SlottedPage::get(RecordID record_id)
 {
     u_int16_t size;
@@ -84,15 +75,10 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
         {
             throw "Not enough room in block";
         }
-        // this->slide(loc + new_size, loc + size);
+        // OLD: this->slide(loc + new_size, loc + size);
         this->slide(loc, loc - extra);
-        // std::cout << "put, before memmove\n";
-        // print_mem(this->address(0), DbBlock::BLOCK_SZ);
-        // memmove(this->address(loc - extra), data.get_data(), new_size);
+        // OLD: memmove(this->address(loc - extra), data.get_data(), new_size);
         memmove(this->address(loc - extra), data.get_data(), (extra + size));
-
-        // std::cout << "put, after memmove\n";
-        // print_mem(this->address(0), DbBlock::BLOCK_SZ);
     }
     else
     {
@@ -108,17 +94,13 @@ void SlottedPage::del(RecordID record_id)
     u_int16_t size;
     u_int16_t loc;
 
-    // print_mem(this->address(this->end_free+1),1); // 09
     this->get_header(size, loc, record_id);
     this->put_header(record_id, 0, 0);
-    // std::cout << size << ":size, " << loc << ":loc";
     this->slide(loc, loc + size); // ?
-    // print_mem(this->address(0), DbBlock::BLOCK_SZ);
 }
 
 RecordIDs *SlottedPage::ids(void)
 {
-    // caller is responsible for cleaning up memory
     RecordIDs *record_ids = new RecordIDs();
     for (RecordID id = 1; id <= this->num_records; id++)
     {
@@ -146,7 +128,6 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
         return;
 
     int shift = end - start;
-    // std::cout << "shift::" << shift << std::endl;
     if (shift < 0)
     {
         // means we are sliding data to the left because of addition
@@ -159,18 +140,15 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
         memmove(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), dist);
     }
 
-    // std::cout << "BEGIN>>> " << start << ":start " << end << ":end " << std::endl;
     RecordIDs *record_ids = ids();
     for (const RecordID &id : *record_ids)
     {
         u_int16_t size;
         u_int16_t loc;
         this->get_header(size, loc, id);
-        // std::cout << size << ":size, " << loc << ":loc, " << id << ":id, " << shift << ":shift" << std::endl;
-        if (loc <= start) // loc < end
+        if (loc <= start) // OLD: loc < end
         {
             loc += shift;
-            // std::cout << "UPDATING -> " << id << ":record_id, " << size << ":size, " << loc << ":loc, \n";
             this->put_header(id, size, loc);
         }
     }
@@ -217,7 +195,6 @@ void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id)
 };
 
 //// HeapFile
-// NOTE: Don't need to implement constructor
 
 // public
 void HeapFile::create(void)
@@ -230,7 +207,6 @@ void HeapFile::create(void)
 void HeapFile::drop(void)
 {
     this->close();
-    // _DB_ENV->dbremove(nullptr, this->dbfilename.c_str(), nullptr, 0);
     std::remove(this->dbfilename.c_str());
 };
 
@@ -245,7 +221,6 @@ void HeapFile::close(void)
     this->closed = true;
 };
 
-// use profs code
 SlottedPage *HeapFile::get_new(void)
 {
     char block[DbBlock::BLOCK_SZ];
@@ -259,12 +234,6 @@ SlottedPage *HeapFile::get_new(void)
     return page;
 };
 
-/**
- * db.get()
- * If key is an integer then the DB_SET_RECNO flag is automatically set
- * for BTree databases and the actual key and the data value are returned as a tuple.
- * -- python api, and read the C++ api too.
- */
 SlottedPage *HeapFile::get(BlockID block_id)
 {
     char block[DbBlock::BLOCK_SZ];
@@ -283,7 +252,6 @@ void HeapFile::put(DbBlock *block)
     this->db.put(nullptr, &key, &data, 0);
 };
 
-// deallocate me !
 BlockIDs *HeapFile::block_ids()
 {
     BlockIDs *block_ids = new BlockIDs;
@@ -336,7 +304,7 @@ void HeapTable::create_if_not_exists()
             this->create();
         }
         else
-        { // unexpected exception
+        {
             throw e;
         }
     }
@@ -412,7 +380,6 @@ ValueDict *HeapTable::project(Handle handle)
     return row;
 };
 
-// not tested
 ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names)
 {
     BlockID block_id = handle.first;
@@ -429,7 +396,6 @@ ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names)
 };
 
 // protected
-
 ValueDict *HeapTable::validate(const ValueDict *row)
 {
     ValueDict *full_row = new ValueDict;
@@ -453,7 +419,7 @@ Handle HeapTable::append(const ValueDict *row)
     RecordID record_id;
     BlockID block_id = this->file.get_last_block_id();
     Dbt *data = marshal(row);
-    SlottedPage *block = this->file.get(block_id); // fixed
+    SlottedPage *block = this->file.get(block_id);
     try
     {
         record_id = block->add(data);
@@ -467,7 +433,6 @@ Handle HeapTable::append(const ValueDict *row)
     return {record_id, block_id};
 };
 
-// caller responsible for freeing the returned Dbt and its enclosed ret->get_data().
 Dbt *HeapTable::marshal(const ValueDict *row)
 {
     char *bytes = new char[DbBlock::BLOCK_SZ]; // more than we need (we insist that one row fits into DbBlock::BLOCK_SZ)
@@ -497,7 +462,6 @@ Dbt *HeapTable::marshal(const ValueDict *row)
         }
     }
     char *right_size_bytes = new char[offset];
-    //print_mem(bytes, DbBlock::BLOCK_SZ);
     memcpy(right_size_bytes, bytes, offset);
     delete[] bytes;
     Dbt *data = new Dbt(right_size_bytes, offset);
@@ -510,7 +474,6 @@ ValueDict *HeapTable::unmarshal(Dbt *data)
     uint offset = 0;
     uint col_num = 0;
     char *bytes = (char *)data->get_data();
-    //print_mem(bytes, data->get_size());
     for (auto const &column_name : this->column_names)
     {   
         ColumnAttribute ca = this->column_attributes[col_num++];
