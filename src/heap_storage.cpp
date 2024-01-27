@@ -84,12 +84,15 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
         {
             throw "Not enough room in block";
         }
-        //OLD: this->slide(loc + new_size, loc + size);
+        // this->slide(loc + new_size, loc + size);
         this->slide(loc, loc - extra);
-        //print_mem(this->address(0), DbBlock::BLOCK_SZ);
-        //OLD: memmove(this->address(loc - extra), data.get_data(), new_size);
+        // std::cout << "put, before memmove\n";
+        // print_mem(this->address(0), DbBlock::BLOCK_SZ);
+        // memmove(this->address(loc - extra), data.get_data(), new_size);
         memmove(this->address(loc - extra), data.get_data(), (extra + size));
-        //print_mem(this->address(0), DbBlock::BLOCK_SZ);
+
+        // std::cout << "put, after memmove\n";
+        // print_mem(this->address(0), DbBlock::BLOCK_SZ);
     }
     else
     {
@@ -104,14 +107,11 @@ void SlottedPage::del(RecordID record_id)
 {
     u_int16_t size;
     u_int16_t loc;
-
-    std::cout << this->end_free+1 << ":endrgre+1\n";
     // print_mem(this->address(this->end_free+1),1); // 09
     this->get_header(size, loc, record_id);
     this->put_header(record_id, 0, 0);
-    //std::cout << size << ":size, " << loc << ":loc";
     this->slide(loc, loc + size); // ?
-    //print_mem(this->address(0), DbBlock::BLOCK_SZ);
+    // print_mem(this->address(0), DbBlock::BLOCK_SZ);
 }
 
 RecordIDs *SlottedPage::ids(void)
@@ -142,29 +142,32 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
 {
     if (start == end)
         return;
-    
+
     int shift = end - start;
-    if (shift < 0) { 
+    if (shift < 0)
+    {
         // means we are sliding data to the left because of addition
         memmove(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), abs(shift));
-    } else { 
+    }
+    else
+    {
         // means we are sliding data to the right because of a deletion
         uint dist = (DbBlock::BLOCK_SZ - shift) - (this->end_free + 1);
         memmove(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), dist);
     }
 
-    std::cout << "BEGIN>>> " << start << ":start " << end << ":end " << std::endl;
+    // std::cout << "BEGIN>>> " << start << ":start " << end << ":end " << std::endl;
     RecordIDs *record_ids = ids();
     for (const RecordID &id : *record_ids)
     {
         u_int16_t size;
         u_int16_t loc;
         this->get_header(size, loc, id);
-        std::cout << size << ":size, " << loc << ":loc, " << id << ":id, " << shift << ":shift" << std::endl;
+        // std::cout << size << ":size, " << loc << ":loc, " << id << ":id, " << shift << ":shift" << std::endl;
         if (loc <= start) // loc < end
         {
             loc += shift;
-            std::cout << "UPDATING -> " << id << ":record_id, " << size << ":size, " << loc << ":loc, \n";
+            // std::cout << "UPDATING -> " << id << ":record_id, " << size << ":size, " << loc << ":loc, \n";
             this->put_header(id, size, loc);
         }
     }
@@ -290,7 +293,8 @@ BlockIDs *HeapFile::block_ids()
 // protected
 void HeapFile::db_open(uint flags)
 {
-    if (!this->closed) return;
+    if (!this->closed)
+        return;
     const char *home;
     _DB_ENV->get_home(&home);
     dbfilename = home + name + ".db";
@@ -475,46 +479,33 @@ Dbt *HeapTable::marshal(const ValueDict *row)
     return data;
 }
 
-ValueDict *HeapTable::unmarshal(Dbt *data) { return nullptr; };
-
-/// TEST
-
-// test function provided by professor
-bool test_heap_storage()
+ValueDict *HeapTable::unmarshal(Dbt *data)
 {
-    ColumnNames column_names;
-    column_names.push_back("a");
-    column_names.push_back("b");
-    ColumnAttributes column_attributes;
-    ColumnAttribute ca(ColumnAttribute::INT);
-    column_attributes.push_back(ca);
-    ca.set_data_type(ColumnAttribute::TEXT);
-    column_attributes.push_back(ca);
-    HeapTable table1("_test_create_drop_cpp", column_names, column_attributes);
-    table1.create();
-    std::cout << "create ok" << std::endl;
-    table1.drop(); // drop makes the object unusable because of BerkeleyDB
-    // restriction-- maybe want to fix this some day
-    std::cout << "drop ok" << std::endl;
-    HeapTable table("_test_data_cpp", column_names, column_attributes);
-    table.create_if_not_exists();
-    std::cout << "create_if_not_exsts ok" << std::endl;
-    ValueDict row;
-    row["a"] = Value(12);
-    row["b"] = Value("Hello!");
-    std::cout << "try insert" << std::endl;
-    table.insert(&row);
-    std::cout << "insert ok" << std::endl;
-    Handles *handles = table.select();
-    std::cout << "select ok " << handles->size() << std::endl;
-    ValueDict *result = table.project((*handles)[0]);
-    std::cout << "project ok" << std::endl;
-    Value value = (*result)["a"];
-    if (value.n != 12)
-        return false;
-    value = (*result)["b"];
-    if (value.s != "Hello!")
-        return false;
-    table.drop();
-    return true;
-}
+    ValueDict *row = new ValueDict();
+    uint offset = 0;
+    uint col_num = 0;
+    for (auto const &column_name : this->column_names)
+    {
+        ColumnAttribute ca = this->column_attributes[col_num++];
+        if (ca.get_data_type() == ColumnAttribute::DataType::INT)
+        {
+            char *bytes = (char *)data->get_data() + offset;
+            (*row)[column_name] = *(int32_t *)bytes;
+            offset += sizeof(int32_t);
+        }
+        else if (ca.get_data_type() == ColumnAttribute::DataType::TEXT)
+        {
+            char *bytes = (char *)data->get_data() + offset;
+            u_int16_t size;
+            memcpy(&size, bytes, sizeof(u_int16_t));
+            std::string text(bytes + sizeof(u_int16_t), size);
+            (*row)[column_name] = text;
+            offset += sizeof(u_int16_t) + size;
+        }
+        else
+        {
+            throw DbRelationError("Only know how to marshal INT and TEXT");
+        }
+    }
+    return row;
+};
