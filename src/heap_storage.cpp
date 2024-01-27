@@ -84,11 +84,11 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
         {
             throw "Not enough room in block";
         }
-        this->slide(loc + new_size, loc + size);
-        //std::cout << "put, before memmove\n";
+        //OLD: this->slide(loc + new_size, loc + size);
+        this->slide(loc, loc - extra);
         //print_mem(this->address(0), DbBlock::BLOCK_SZ);
-        memmove(this->address(loc - extra), data.get_data(), new_size);
-        //std::cout << "put, after memmove\n";
+        //OLD: memmove(this->address(loc - extra), data.get_data(), new_size);
+        memmove(this->address(loc - extra), data.get_data(), (extra + size));
         //print_mem(this->address(0), DbBlock::BLOCK_SZ);
     }
     else
@@ -161,7 +161,7 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
         u_int16_t loc;
         this->get_header(size, loc, id);
         std::cout << size << ":size, " << loc << ":loc, " << id << ":id, " << shift << ":shift" << std::endl;
-        if (loc < end)
+        if (loc <= start) // loc < end
         {
             loc += shift;
             std::cout << "UPDATING -> " << id << ":record_id, " << size << ":size, " << loc << ":loc, \n";
