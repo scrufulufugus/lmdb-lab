@@ -5,20 +5,42 @@
 #include <iomanip>
 #include <fstream>
 #include <cstdio>
+#include <cstdlib>
 
 // helper util functions
 Dbt *marshal_text(std::string text);
 std::string unmarshal_text(Dbt &block);
+void remove_files(std::vector<std::string> file_names);
+
+class HeapFixture : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        const char *home = std::getenv("HOME");
+        DbEnv *env = new DbEnv(0U);
+        env->set_message_stream(&std::cout);
+        env->set_error_stream(&std::cerr);
+        std::string envdir = std::string(home) + "/cpsc5300/data";
+        env->open(envdir.c_str(), DB_CREATE | DB_INIT_MPOOL, 0);
+        _DB_ENV = env;
+    }
+
+    void TearDown() override
+    {
+        _DB_ENV->close(0U);                         // deallocates memory for me
+        int res = std::system("rm -f ../data/__*"); // remove the .db files in _DB_ENV home
+        if (res != 0)
+        {
+            std::cout << "\n!!! Failed to remove .db files in /data, manually remove it before running the test again !!!\n";
+        }
+        std::cout << "Removed .db files in ../data\n";
+    }
+};
 
 namespace
 {
-    TEST(sample_test_case, sample_test)
-    {
-        EXPECT_EQ(1, 1);
-    }
-
-    // Slotted Page
-    TEST(slotted_page, test_basics)
+    TEST(slotted_page, slotted_page_basics)
     {
         char block[DbBlock::BLOCK_SZ];
         memset(block, 0, sizeof(block));
@@ -92,27 +114,10 @@ namespace
         delete t4_rd;
     }
 
-    // Heap File
-    TEST(heap_file, test_basics)
+    TEST_F(HeapFixture, heap_file_basics)
     {
-        // clean up
-        const char *home = std::getenv("HOME");
-        std::string d_file_name = std::string(home) + "/cpsc5300/data_my_heapfile.db";
-        std::ifstream d_file(d_file_name);
-        if (d_file.is_open())
-        {
-            std::cout << "Deleting previously created dummy file...\n";
-            std::remove(d_file_name.c_str());
-        }
+        remove_files({"_my_heapfile"});
 
-        // init
-        DbEnv *env = new DbEnv(0U);
-        env->set_message_stream(&std::cout);
-        env->set_error_stream(&std::cerr);
-        std::string envdir = std::string(home) + "/cpsc5300/data";
-        env->open(envdir.c_str(), DB_CREATE | DB_INIT_MPOOL, 0);
-        _DB_ENV = env;
-        
         //// create, put SlottedPage, close it
         std::string text = "_my_heapfile";
         HeapFile file(text);
@@ -128,39 +133,67 @@ namespace
         Dbt data(block, sizeof(block));
         BlockID block_id = 1;
         SlottedPage *page = new SlottedPage(data, block_id, true);
-        
+
         // add data to my page and put it into block
         std::string value = "hhancock";
-        Dbt *rename_me = marshal_text(value); // rename me
-        RecordID record_id = page->add(rename_me);
+        Dbt *d_value = marshal_text(value);
+        RecordID record_id = page->add(d_value);
         file.put(page);
 
-        file.close();  // The DB handle may not be accessed again after Db::close() is called, regardless of its return. 
-        // open it again, get block_ids, get SlottedPage, drop it
+        file.close(); // The DB handle may not be accessed again after Db::close() is called, regardless of its return.
+        //// open it again, get SlottedPage, drop it
         HeapFile n_file(text);
         n_file.open();
 
         SlottedPage *r_page = n_file.get(block_id);
-        Dbt *r_data= page->get(record_id);
+        Dbt *r_data = page->get(record_id);
         std::string r_value = unmarshal_text(*r_data);
-        ASSERT_EQ(value, r_value); 
+        ASSERT_EQ(value, r_value);
 
         n_file.drop();
-        // clean up
-        _DB_ENV->close(0U); // deallocates memory for me
     }
 
-    // Heap Table
-    TEST(heap_table, does_init_work)
+    TEST_F(HeapFixture, heap_table_basics)
     {
-        Identifier identifier = "my_identifier";
-        ColumnNames column_names{"a", "b"};
-        ColumnAttributes column_attribs;
-        ColumnAttribute column_attrib(ColumnAttribute::INT);
-        column_attribs.push_back(column_attrib);
-        column_attrib.set_data_type(ColumnAttribute::TEXT);
-        column_attribs.push_back(column_attrib);
-        HeapTable(identifier, column_names, column_attribs);
+        remove_files({"_test_create_drop_cpp", "_test_data_cpp"});
+
+        // setup
+        ColumnNames column_names;
+        column_names.push_back("a");
+        column_names.push_back("b");
+        ColumnAttributes column_attributes;
+        ColumnAttribute ca(ColumnAttribute::INT);
+        column_attributes.push_back(ca);
+        ca.set_data_type(ColumnAttribute::TEXT);
+        column_attributes.push_back(ca);
+
+        // start testing
+        std::cout << "creating..." << std::endl;
+        HeapTable table1("_test_create_drop_cpp", column_names, column_attributes);
+        std::cout << "table1 created..." << std::endl;
+        table1.create();
+        std::cout << "create ok" << std::endl;
+        table1.drop(); // drop makes the object unusable because of BerkeleyDB
+        // restriction-- maybe want to fix this some day
+        std::cout << "drop ok" << std::endl;
+        HeapTable table("_test_data_cpp", column_names, column_attributes);
+        table.create_if_not_exists();
+        std::cout << "create_if_not_exsts ok" << std::endl;
+        ValueDict row;
+        row["a"] = Value(12);
+        row["b"] = Value("Hello!");
+        std::cout << "try insert" << std::endl;
+        table.insert(&row);
+        std::cout << "insert ok" << std::endl;
+        Handles *handles = table.select();
+        std::cout << "select ok " << handles->size() << std::endl;
+        ValueDict *result = table.project((*handles)[0]);
+        std::cout << "project ok" << std::endl;
+        Value value = (*result)["a"];
+        ASSERT_EQ(value.n, 12);
+        value = (*result)["b"];
+        ASSERT_EQ(value.s, "Hello!");
+        table.drop();
     }
 }
 
@@ -190,4 +223,19 @@ std::string unmarshal_text(Dbt &data)
     memcpy(&size, bytes, sizeof(u_int16_t));
     std::string text(bytes + sizeof(u_int16_t), size);
     return text;
+}
+
+void remove_files(std::vector<std::string> file_names)
+{
+    const char *home = std::getenv("HOME");
+    for (const auto &file_name : file_names)
+    {
+        std::string path = std::string(home) + "/cpsc5300/data" + file_name + ".db";
+        std::ifstream file(path);
+        if (file.is_open())
+        {
+            std::cout << "Deleting previously created dummy file " << file_name << "\n";
+            std::remove(path.c_str());
+        }
+    }
 }
