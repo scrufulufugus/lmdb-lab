@@ -1,22 +1,6 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
-#include <iomanip>
 // When you get a block from BerkDB with db->get, you don't ever free this memory.
-
-// util function to view the block in a SlottedPage
-void print_mem(const void *data, size_t size)
-{
-    auto *bytes = static_cast<const unsigned char *>(data);
-    for (size_t i = 0; i < size; ++i)
-    {
-        std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)bytes[i];
-        if ((i + 1) % 16 == 0)
-            std::cout << std::endl;
-        else
-            std::cout << " ";
-    }
-    std::cout << std::dec << std::endl;
-}
 
 DbEnv *_DB_ENV = nullptr;
 
