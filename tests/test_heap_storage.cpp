@@ -2,7 +2,6 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
 #include <iostream>
-#include <iomanip>
 #include <fstream>
 #include <cstdio>
 #include <cstdlib>
@@ -115,6 +114,7 @@ namespace
         delete t3_rd;
         delete t4_d;
         delete t4_rd;
+        delete e_rd;
     }
 
     TEST_F(HeapFixture, heap_file_basics)

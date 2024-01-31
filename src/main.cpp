@@ -134,6 +134,8 @@ bool test_heap_storage()
 		std::cout << "\n!!! Failed to remove .db files in /data, manually remove it before running the test again !!!\n";
 	}
 	std::cout << "Removed .db files in ../data\n";
+	delete handles;
+    delete result;
 
 	return true;
 }
