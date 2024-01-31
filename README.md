@@ -15,12 +15,16 @@ After cloning, this is what your directory should look like:
 ## Building & Usage
 Go to the project directory:
 
-`cd ~/cpsc5300/5300-Antelope`
+`$ cd ~/cpsc5300/5300-Antelope`
 
 To run the SQL Parser from Milestone 1:
 
-`make clean && make && ./sql5300 cpsc5300/data`
+`$ make clean && make && ./sql5300 cpsc5300/data`
 
-To run the tests on SlottedPage, HeapFile, and HeapTable from Milestone 2:
+While you are running the SQL parser, you have the option to run professor's `test_heap_storage` function:
 
-`make clean && make test && ./test`
+`$ SQL> test`
+
+To run my tests on SlottedPage, HeapFile, and HeapTable from Milestone 2:
+
+`$ make clean && make test && ./test`
