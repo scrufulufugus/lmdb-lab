@@ -117,6 +117,57 @@ namespace
         delete e_rd;
     }
 
+    TEST(slotted_page, slotted_page_delete_in_middle) {
+        // add three values into page: eelias, tyamashita, wcarlos
+        // remove tyamahsita, everything else should retrievable
+
+        char block[DbBlock::BLOCK_SZ];
+        memset(block, 0, sizeof(block));
+        Dbt data(block, sizeof(block));
+
+        RecordID id = 0;
+        SlottedPage *page = new SlottedPage(data, id, true); // set this to true so page->add wouldn't seg fault
+
+        std::string t1_v = "eelias";
+        std::string t2_v = "tyamashita";
+        std::string t3_v = "wcarlos";
+
+        Dbt *t1_d = marshal_text(t1_v);
+        Dbt *t2_d = marshal_text(t2_v);
+        Dbt *t3_d = marshal_text(t3_v);
+
+        RecordID t1_id = page->add(t1_d);
+        RecordID t2_id = page->add(t2_d);
+        RecordID t3_id = page->add(t3_d);
+
+        page->del(t2_id);
+        
+        RecordIDs *rids = page->ids();
+        RecordIDs expected_rids = {1,3};
+        ASSERT_EQ(*rids, expected_rids);
+
+        Dbt *t1_rd = page->get(t1_id);
+        Dbt *t2_rd = page->get(t2_id); // should be missing
+        Dbt *t3_rd = page->get(t3_id);
+
+        std::string t1_rv = unmarshal_text(*t1_rd);
+        std::string t3_rv = unmarshal_text(*t3_rd);
+
+        ASSERT_EQ(t1_v, t1_rv);
+        ASSERT_EQ(t3_v, t3_rv);
+        ASSERT_EQ(t2_rd, nullptr); // t2_rd should point to NULL
+
+        // cleanup
+        delete t1_d;
+        delete t2_d;
+        delete t3_d;
+        delete t1_rd;
+        delete t2_rd;
+        delete t3_rd;
+        delete page;
+        delete rids;
+    }
+
     TEST_F(HeapFixture, heap_file_basics)
     {
         remove_files({"_my_heapfile"});

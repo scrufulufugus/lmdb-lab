@@ -127,7 +127,8 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end)
     else
     {
         // means we are sliding data to the right because of a deletion
-        uint dist = (DbBlock::BLOCK_SZ - shift) - (this->end_free + 1);
+        uint extra = (DbBlock::BLOCK_SZ - end); // count extra bytes we don't want to remove
+        uint dist = (DbBlock::BLOCK_SZ - shift - extra) - (this->end_free + 1);
         memmove(this->address(this->end_free + 1 + shift), this->address(this->end_free + 1), dist);
     }
 
