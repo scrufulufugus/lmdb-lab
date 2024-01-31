@@ -32,7 +32,6 @@ int main(int argc, char *argv[])
 
 	const char *home = std::getenv("HOME");
 	std::string envdir = std::string(home) + "/" + argv[1];
-	std::cout << envdir << "\n";
 
 	// setup DB environment
 	DbEnv env(0U);
