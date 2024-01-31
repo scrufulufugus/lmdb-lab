@@ -255,7 +255,7 @@ void HeapFile::db_open(uint flags)
     _DB_ENV->get_home(&home);
     dbfilename = home + name + ".db";
     this->db.set_re_len(DbBlock::BLOCK_SZ);
-    this->db.open(nullptr, dbfilename.c_str(), nullptr, DB_RECNO, flags, 0);
+    this->db.open(nullptr, dbfilename.c_str(), nullptr, DB_RECNO, flags, 0644);
     char stats[sizeof(DB_BTREE_STAT)];
     memset(stats, 0, sizeof(DB_BTREE_STAT));
     this->db.stat(nullptr, stats, DB_FAST_STAT);
