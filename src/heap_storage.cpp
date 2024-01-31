@@ -20,6 +20,7 @@ SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(bl
     }
 };
 
+// Add Dbt into Slotted Page
 RecordID SlottedPage::add(const Dbt *data)
 {
     if (!has_room(data->get_size()))
@@ -34,6 +35,7 @@ RecordID SlottedPage::add(const Dbt *data)
     return id;
 }
 
+// Get Dbt by record_id, make sure to deallocate
 Dbt *SlottedPage::get(RecordID record_id)
 {
     u_int16_t size;
@@ -46,6 +48,7 @@ Dbt *SlottedPage::get(RecordID record_id)
     return new Dbt(this->address(loc), size);
 }
 
+// Replace the data at record_id with new Dbt
 void SlottedPage::put(RecordID record_id, const Dbt &data)
 {
     u_int16_t size;
@@ -73,6 +76,7 @@ void SlottedPage::put(RecordID record_id, const Dbt &data)
     this->put_header(record_id, new_size, loc);
 }
 
+// Remove data at record_id
 void SlottedPage::del(RecordID record_id)
 {
     u_int16_t size;
@@ -83,6 +87,7 @@ void SlottedPage::del(RecordID record_id)
     this->slide(loc, loc + size); // ?
 }
 
+// Get existing record_ids in SlottedPage, make sure to deallocate
 RecordIDs *SlottedPage::ids(void)
 {
     RecordIDs *record_ids = new RecordIDs();
@@ -100,12 +105,14 @@ RecordIDs *SlottedPage::ids(void)
 }
 
 // protected
+// Check if SlottedPage has room
 bool SlottedPage::has_room(u_int16_t size)
 {
     u_int16_t available = this->end_free - (this->num_records + 1) * 4;
     return size <= available;
 };
 
+// Slide data left or right, and update the records
 void SlottedPage::slide(u_int16_t start, u_int16_t end)
 {
     if (start == end)
@@ -171,6 +178,7 @@ void SlottedPage::put_header(RecordID id, u_int16_t size, u_int16_t loc)
     put_n(4 * id + 2, loc);
 }
 
+// Get size and offset for record_id
 void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id)
 {
     // headers are 4 bytes in size
@@ -181,30 +189,36 @@ void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id)
 //// HeapFile
 
 // public
+// Create a new block
 void HeapFile::create(void)
 {
     this->db_open(DB_CREATE | DB_EXCL);
     SlottedPage *block = this->get_new();
     this->put(block);
+    delete block;
 };
 
+// Drop this current file, remove the db file
 void HeapFile::drop(void)
 {
     this->close();
     std::remove(this->dbfilename.c_str());
 };
 
+// Open current file
 void HeapFile::open(void)
 {
     this->db_open();
 };
 
+// Close current file
 void HeapFile::close(void)
 {
     this->db.close(0);
     this->closed = true;
 };
 
+// Allocate a new block and give it a block_id, make sure to deallocate
 SlottedPage *HeapFile::get_new(void)
 {
     char block[DbBlock::BLOCK_SZ];
@@ -218,6 +232,7 @@ SlottedPage *HeapFile::get_new(void)
     return page;
 };
 
+// Get an existing block from the file, make sure to deallocate
 SlottedPage *HeapFile::get(BlockID block_id)
 {
     char block[DbBlock::BLOCK_SZ];
@@ -228,6 +243,7 @@ SlottedPage *HeapFile::get(BlockID block_id)
     return new SlottedPage(data, block_id);
 };
 
+// Replace an existing block in the file
 void HeapFile::put(DbBlock *block)
 {
     BlockID block_id(block->get_block_id());
@@ -236,6 +252,7 @@ void HeapFile::put(DbBlock *block)
     this->db.put(nullptr, &key, &data, 0);
 };
 
+// Get existing block_ids in the file, make sure to deallocate
 BlockIDs *HeapFile::block_ids()
 {
     BlockIDs *block_ids = new BlockIDs;
@@ -247,6 +264,7 @@ BlockIDs *HeapFile::block_ids()
 };
 
 // protected
+// Open BerkleyDB
 void HeapFile::db_open(uint flags)
 {
     if (!this->closed)
@@ -321,6 +339,7 @@ void HeapTable::update(const Handle handle, const ValueDict *new_values){};
 // not required for Milestone 2
 void HeapTable::del(const Handle handle){};
 
+// Select all, return existing handles in this table
 Handles *HeapTable::select()
 {
     Handles *handles = new Handles();
@@ -338,6 +357,7 @@ Handles *HeapTable::select()
     return handles;
 };
 
+// not required for Milestone 2
 Handles *HeapTable::select(const ValueDict *where)
 {
     Handles *handles = new Handles();
@@ -355,6 +375,7 @@ Handles *HeapTable::select(const ValueDict *where)
     return handles;
 }
 
+// Display the row with the associated handle
 ValueDict *HeapTable::project(Handle handle)
 {
     BlockID block_id = handle.first;
@@ -364,6 +385,7 @@ ValueDict *HeapTable::project(Handle handle)
     return row;
 };
 
+// Display the row with the associated handle and its column names
 ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names)
 {
     BlockID block_id = handle.first;
@@ -380,6 +402,8 @@ ValueDict *HeapTable::project(Handle handle, const ColumnNames *column_names)
 };
 
 // protected
+
+// Check if row can be inserted, throw exception if unable to
 ValueDict *HeapTable::validate(const ValueDict *row)
 {
     ValueDict *full_row = new ValueDict;
@@ -398,6 +422,7 @@ ValueDict *HeapTable::validate(const ValueDict *row)
     return full_row;
 };
 
+// Add a new row to the file
 Handle HeapTable::append(const ValueDict *row)
 {
     RecordID record_id;
