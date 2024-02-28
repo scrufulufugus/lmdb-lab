@@ -8,7 +8,7 @@ int main() {
   auto env = lmdb::env::create();
   env.set_mapsize(1UL * 1024UL * 1024UL * 1024UL); /* 1 GiB */
   const char *home = std::getenv("HOME");
-  std::string env_dir = std::string(home) + "/Projects/lmdb-test/data/example.mdb";
+  std::string env_dir = std::string(home) + "/Projects/lmdb-lab/data/example.mdb";
   env.open(env_dir.c_str(), 0, 0664);
 
   /* Insert some key/value pairs in a write transaction: */
