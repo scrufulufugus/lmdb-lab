@@ -24,5 +24,5 @@ $(TEST): $(TEST_OBJS)
 	g++ $(FLAGS) -c $< -o $@
 
 clean:
-	$(RM) src/*.o tests/*.o $(MAIN) $(TEST)
+	$(RM) src/*.o tests/*.o data/example.mdb/*.mdb $(MAIN) $(TEST)
 
