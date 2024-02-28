@@ -1,1 +1,5 @@
 data/example.mdb/*
+to-move
+*.o
+test
+out
