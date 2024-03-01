@@ -1,7 +1,8 @@
-FLAGS := -I/usr/local/include -L/usr/local/lib -Isrc -DHAVE_CXX_STDHEADERS -D_GNU_SOURCE -D_REENTRANT -O3 -std=c++20
-
-LIBS := -llmdb -lsqlparser
-TEST_LIBS := -lgtest -lgtest_main -pthread
+CPPFLAGS     = -I/usr/local/include -Isrc -Wall -Wextra -Wpedantic
+CXXFLAGS     = -DHAVE_CXX_STDHEADERS -D_GNU_SOURCE -D_REENTRANT -O3 -std=c++20
+LDFLAGS      = -L/usr/local/lib
+LDLIBS       = -llmdb -lsqlparser
+TEST_LDLIBS := -lgtest -lgtest_main -pthread
 
 SRCS := $(wildcard src/*.cpp)
 TESTS := $(wildcard tests/*.cpp)
@@ -9,19 +10,20 @@ TESTS := $(wildcard tests/*.cpp)
 OBJS := $(SRCS:.cpp=.o)
 TEST_OBJS := $(filter-out src/main.o, $(OBJS)) $(TESTS:.cpp=.o)
 
-MAIN := out
+MAIN := lmdb-lab
 TEST := test
 
 all: $(MAIN)
 
 $(MAIN): $(OBJS)
-	g++ $(FLAGS) -o $(MAIN) $(OBJS) $(LIBS)
+	$(CXX) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
+$(TEST): LDLIBS += $(TEST_LDLIBS)
 $(TEST): $(TEST_OBJS)
-	g++ $(FLAGS) -o $(TEST) $(TEST_OBJS) $(LFLAGS) $(LIBS) $(TEST_LIBS)
+	$(CXX) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 %.o: %.cpp
-	g++ $(FLAGS) -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	$(RM) src/*.o tests/*.o data/example.mdb/*.mdb $(MAIN) $(TEST)
