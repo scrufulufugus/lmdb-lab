@@ -1,17 +1,23 @@
 #include <cstdio>
 #include <cstdlib>
 #include <lmdb++.h>
+#include <lmdb.h>
 #include <hsql/SQLParser.h>
 #include <string>
 
 int main() {
   /* Create and open the LMDB environment: */
   auto env = lmdb::env::create();
+  
   env.set_mapsize(1UL * 1024UL * 1024UL * 1024UL); /* 1 GiB */
   const char *home = std::getenv("HOME");
   std::string env_dir =
       std::string(home) + "/Projects/lmdb-lab/data/example.mdb";
   env.open(env_dir.c_str(), 0, 0664);
+
+  // const char *path;
+  // mdb_env_get_path(env, &path);
+  // printf("%s", path);
 
   /* Insert some key/value pairs in a write transaction: */
   auto wtxn = lmdb::txn::begin(env);

@@ -1,7 +1,7 @@
 /**
  * @file heap_storage.h - Implementation of storage_engine with a heap file structure.
  * SlottedPage: DbBlock
- * HeapFile: DbFile
+ * BTFile: DbFile
  * HeapTable: DbRelation
  *
  * @author Kevin Lundeen
@@ -71,5 +71,46 @@ protected:
     virtual void put_n(u_int16_t offset, u_int16_t n);
 
     virtual void *address(u_int16_t offset);
+};
+
+class BTFile : public DbFile {
+public:
+    BTFile(std::string name) : DbFile(name), dbfilename(""), last(0), closed(true), dbi(0) {}
+
+    virtual ~BTFile() {}
+
+    BTFile(const BTFile &other) = delete;
+
+    BTFile(BTFile &&temp) = delete;
+
+    BTFile &operator=(const BTFile &other) = delete;
+
+    BTFile &operator=(BTFile &&temp) = delete;
+
+    virtual void create(void);
+
+    virtual void drop(void);
+
+    virtual void open(void);
+
+    virtual void close(void);
+
+    virtual SlottedPage *get_new(void);
+
+    virtual SlottedPage *get(BlockID block_id);
+
+    virtual void put(DbBlock *block);
+
+    virtual BlockIDs *block_ids();
+
+    virtual u_int32_t get_last_block_id() { return last; }
+
+protected:
+    std::string dbfilename;
+    u_int32_t last;
+    bool closed;
+    MDB_dbi dbi;
+
+    virtual void db_open(uint flags = 0);
 };
 

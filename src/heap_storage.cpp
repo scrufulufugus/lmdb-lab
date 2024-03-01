@@ -1,7 +1,7 @@
 #include "heap_storage.h"
 #include "storage_engine.h"
 
-MDB_env *_DB_ENV = nullptr;
+MDB_env *_MDB_ENV = nullptr;
 
 //// SlottedPage
 // public
@@ -184,5 +184,127 @@ void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id)
     // headers are 4 bytes in size
     size = get_n(4 * id);
     loc = get_n(4 * id + 2);
+};
+
+//// BTFile
+// public
+
+// Create a new block
+void BTFile::create(void)
+{
+    this->db_open(0);
+    SlottedPage *block = this->get_new();
+    this->put(block);
+    delete block;
+};
+
+// Drop this current file, remove the db file
+void BTFile::drop(void)
+{
+    this->close();
+    std::remove(this->dbfilename.c_str());
+};
+
+// Open current file
+void BTFile::open(void)
+{
+    this->db_open();
+};
+
+// Close current file
+void BTFile::close(void)
+{
+
+	MDB_txn *txn = nullptr;
+	mdb_txn_begin(_MDB_ENV, nullptr, 0, &txn);
+	mdb_dbi_close(_MDB_ENV, this->dbi);
+	mdb_txn_commit(txn);
+
+    this->closed = true;
+};
+
+// Allocate a new block and give it a block_id, make sure to deallocate
+SlottedPage *BTFile::get_new(void)
+{
+    char block[DbBlock::BLOCK_SZ];
+    memset(block, 0, sizeof(block));
+    MDB_val data(sizeof(block), block);
+    int block_id = ++this->last;
+    MDB_val key(sizeof(block_id), &block_id);
+    SlottedPage *page = new SlottedPage(data, this->last, true);
+	
+	MDB_txn *txn = nullptr;
+	mdb_txn_begin(_MDB_ENV, nullptr, 0, &txn);
+	mdb_put(txn, this->dbi, &key, &data, 0);
+	mdb_get(txn, this->dbi, &key, &data);
+	mdb_txn_commit(txn);
+
+    return page;
+};
+
+// Get an existing block from the file, make sure to deallocate
+SlottedPage *BTFile::get(BlockID block_id)
+{
+    char block[DbBlock::BLOCK_SZ];
+    memset(block, 0, sizeof(block));
+	MDB_val data(sizeof(block), block);
+	MDB_val key(sizeof(BlockID), &block_id);
+
+	MDB_txn *txn = nullptr;
+	mdb_txn_begin(_MDB_ENV, nullptr, 0, &txn);
+	mdb_get(txn, this->dbi, &key, &data);
+	mdb_txn_commit(txn);
+
+    return new SlottedPage(data, block_id);
+};
+
+// Replace an existing block in the file
+void BTFile::put(DbBlock *block)
+{
+    BlockID block_id(block->get_block_id());
+    MDB_val key(sizeof(BlockID), &block_id);
+    MDB_val data(DbBlock::BLOCK_SZ, block->get_data());
+
+	MDB_txn *txn = nullptr;
+	mdb_txn_begin(_MDB_ENV, nullptr, 0, &txn);
+	mdb_put(txn, this->dbi, &key, &data, 0); // Maybe use MDB_append here?
+	mdb_txn_commit(txn);
+};
+
+// Get existing block_ids in the file, make sure to deallocate
+BlockIDs *BTFile::block_ids()
+{
+    BlockIDs *block_ids = new BlockIDs;
+    for (u_int32_t i = 1; i <= this->last; i++)
+    {
+        block_ids->push_back(i);
+    }
+    return block_ids;
+};
+
+// protected
+void BTFile::db_open(uint flags)
+{
+    if (!this->closed)
+        return;
+    const char *path;
+    mdb_env_get_path(_MDB_ENV, &path);
+    dbfilename = path + name + ".mdb";
+
+	// make TXN
+	MDB_txn *txn = nullptr;
+	mdb_txn_begin(_MDB_ENV, nullptr, 0, &txn); 
+
+	// open dbi
+	mdb_dbi_open(txn, dbfilename.c_str(), MDB_CREATE | flags, &dbi);
+	
+	// get stats
+	MDB_stat stats;
+	mdb_stat(txn, dbi, &stats);
+    last = stats.ms_entries;
+
+	// clean up
+	mdb_txn_commit(txn);
+    this->closed = false;
 };
 

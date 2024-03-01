@@ -19,7 +19,7 @@
 /**
  * Global variable to hold dbenv.
  */
-extern MDB_env *_DB_ENV;
+extern MDB_env *_MDB_ENV;
 
 /*
  * Convenient aliases for types
