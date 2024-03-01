@@ -2,7 +2,7 @@
  * @file heap_storage.h - Implementation of storage_engine with a heap file structure.
  * SlottedPage: DbBlock
  * BTFile: DbFile
- * HeapTable: DbRelation
+ * BTTable: DbRelation
  *
  * @author Kevin Lundeen
  * @see "Seattle University, CPSC5300, Winter Quarter 2024"
@@ -32,11 +32,9 @@ class SlottedPage : public DbBlock {
 public:
     SlottedPage(MDB_val &block, BlockID block_id, bool is_new = false);
 
-    // Big 5 - we only need the destructor, copy-ctor, move-ctor, and op= are unnecessary
-    // but we delete them explicitly just to make sure we don't use them accidentally
     virtual ~SlottedPage() {}
 
-    SlottedPage(const SlottedPage &other) = delete;
+    SlottedPage(const SlottedPage &other);
 
     SlottedPage(SlottedPage &&temp) = delete;
 
@@ -112,5 +110,55 @@ protected:
     MDB_dbi dbi;
 
     virtual void db_open(uint flags = 0);
+};
+
+class BTTable : public DbRelation {
+public:
+    BTTable(Identifier table_name, ColumnNames column_names, ColumnAttributes column_attributes);
+
+    virtual ~BTTable() {}
+
+    BTTable(const BTTable &other) = delete;
+
+    BTTable(BTTable &&temp) = delete;
+
+    BTTable &operator=(const BTTable &other) = delete;
+
+    BTTable &operator=(BTTable &&temp) = delete;
+
+    virtual void create();
+
+    virtual void create_if_not_exists();
+
+    virtual void drop();
+
+    virtual void open();
+
+    virtual void close();
+
+    virtual Handle insert(const ValueDict *row);
+
+    virtual void update(const Handle handle, const ValueDict *new_values);
+
+    virtual void del(const Handle handle);
+
+    virtual Handles *select();
+
+    virtual Handles *select(const ValueDict *where);
+
+    virtual ValueDict *project(Handle handle);
+
+    virtual ValueDict *project(Handle handle, const ColumnNames *column_names);
+
+protected:
+    BTFile file;
+
+    virtual ValueDict *validate(const ValueDict *row);
+
+    virtual Handle append(const ValueDict *row);
+
+    virtual MDB_val *marshal(const ValueDict *row);
+
+    virtual ValueDict *unmarshal(MDB_val *data);
 };
 

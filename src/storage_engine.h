@@ -10,6 +10,7 @@
 #pragma once
 
 #include <exception>
+#include <system_error>
 #include <map>
 #include <utility>
 #include <vector>
@@ -28,6 +29,7 @@ typedef u_int16_t RecordID;
 typedef u_int32_t BlockID;
 typedef std::vector<RecordID> RecordIDs;
 typedef std::length_error DbBlockNoRoomError;
+typedef std::system_error DbException;
 
 class DbBlock {
 public:
@@ -37,6 +39,15 @@ public:
      * ctor/dtor (subclasses should handle the big-5)
      */
     DbBlock(MDB_val &block, BlockID block_id, bool is_new = false) : block(block), block_id(block_id) {}
+
+	DbBlock(const DbBlock &other) {
+		printf("I get called, im copying\n");
+		block_id = other.block_id;
+		void *data = malloc(DbBlock::BLOCK_SZ);
+		memcpy(data, other.block.mv_data, other.block.mv_size);
+		MDB_val o_block(DbBlock::BLOCK_SZ, data);
+		block = o_block;
+	}
 
     virtual ~DbBlock() {}
 

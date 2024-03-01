@@ -18,19 +18,12 @@ protected:
     void SetUp() override
     {
         const char *home = std::getenv("HOME");
-		/* BDB Version
-        DbEnv *env = new DbEnv(0U);
-        env->set_message_stream(&std::cout);
-        env->set_error_stream(&std::cerr);
-        std::string envdir = std::string(home) + "/cpsc5300/data";
-        env->open(envdir.c_str(), DB_CREATE | DB_INIT_MPOOL, 0);
-        _DB_ENV = env;
-		*/
 		// lmdb version
 		MDB_env *env;
         std::string envdir = std::string(home) + "/Projects/lmdb-lab/data/example.mdb";
 		mdb_env_create(&env);
 		mdb_env_set_mapsize(env, 1UL * 1024UL * 1024UL * 1024UL); // 1Gb
+		mdb_env_set_maxdbs(env, 5);
 		mdb_env_open(env, envdir.c_str(), 0, 0664); // unlike in BDB, we can't pass in DB_CREATE
 		_MDB_ENV = env;
 
@@ -184,6 +177,54 @@ namespace
         delete bids;
         delete page;
         delete r_page;
+    }
+	
+	TEST_F(BTFixture, BT_table_basics)
+    {
+		printf("Entered BT_table test\n");
+        remove_files({"_test_create_drop_cpp", "_test_data_cpp"});
+
+		printf("BT_table: removed files\n");
+        // setup
+        ColumnNames column_names;
+        column_names.push_back("a");
+        column_names.push_back("b");
+        ColumnAttributes column_attributes;
+        ColumnAttribute ca(ColumnAttribute::INT);
+        column_attributes.push_back(ca);
+        ca.set_data_type(ColumnAttribute::TEXT);
+        column_attributes.push_back(ca);
+		printf("BT_table: finish setup\n");
+
+        // start testing
+        BTTable table1("_test_create_drop_cpp", column_names, column_attributes);
+        table1.create();
+        table1.drop(); // drop makes the object unusable because of BerkeleyDB
+
+        // restriction-- maybe want to fix this some day
+        BTTable table("_test_data_cpp", column_names, column_attributes);
+        table.create();
+
+        ValueDict row;
+        row["a"] = Value(12);
+        row["b"] = Value("Hello!");
+
+        table.insert(&row);
+
+        Handles *handles = table.select();
+		printf("select handles\n");
+		int size = handles->size();
+		printf("select handles size %d \n", size);
+        ValueDict *result = table.project((*handles)[0]);
+		printf("select project the handles\n");
+        Value value = (*result)["a"];
+        ASSERT_EQ(value.n, 12);
+        value = (*result)["b"];
+        ASSERT_EQ(value.s, "Hello!");
+        table.drop();
+        // clean up
+        delete handles;
+        delete result;
     }
 }
 
