@@ -1,4 +1,4 @@
-data/example.mdb/*
+data/example.mdb/*.mdb
 to-move
 *.o
 test
