@@ -1,4 +1,4 @@
-FLAGS := -I/usr/local/include -L/usr/local/lib -Isrc -DHAVE_CXX_STDHEADERS -D_GNU_SOURCE -D_REENTRANT -O3 -std=c++20 -g
+FLAGS := -I/usr/local/include -L/usr/local/lib -Isrc -DHAVE_CXX_STDHEADERS -D_GNU_SOURCE -D_REENTRANT -O3 -std=c++20
 
 LIBS := -llmdb -lsqlparser
 TEST_LIBS := -lgtest -lgtest_main -pthread
@@ -25,4 +25,7 @@ $(TEST): $(TEST_OBJS)
 
 clean:
 	$(RM) src/*.o tests/*.o data/example.mdb/*.mdb $(MAIN) $(TEST)
+
+db-clean:
+	$(RM) data/example.mdb/*.mdb
 
