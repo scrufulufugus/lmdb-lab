@@ -12,13 +12,15 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
-        packages = {
+        packages = rec {
           hsql-parser = pkgs.callPackage ./nix/hsql-parser.nix { };
+          lmdb-lab = pkgs.callPackage ./. { inherit hsql-parser; };
+          default = lmdb-lab;
         };
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ ];
-          packages = with pkgs; [ self.packages.${system}.hsql-parser ];
+          inputsFrom = [ self.packages.${system}.lmdb-lab ];
+          packages = with pkgs; [ gnumake ];
         };
       });
 }
