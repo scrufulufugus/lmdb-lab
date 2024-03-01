@@ -12,14 +12,13 @@ stdenv.mkDerivation rec {
 
   src = ./.;
 
-  outputs = [ "bin" "out" ];
   buildInputs = [ lmdb lmdbxx hsql-parser ];
   nativeCheckInputs = [ gtest ];
 
   enableParallelBuilding = true;
 
   installPhase = ''
-    install -Dm755 lmdb-lab -t "$outputBin/"
+    install -Dm755 lmdb-lab -t "$out/bin/"
   '';
 
   doCheck = true;
