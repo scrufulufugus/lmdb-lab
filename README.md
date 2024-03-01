@@ -19,8 +19,10 @@
 	- unlike BDB where we have multiple access methods, e.g. RECNO
 - lmdb uses B+ tree data structure
 	- which means we can only implement a BTree internal representation
+- lmdb does not want you to modify the memory inside `MDB_val`'s data
 ### Minor Notes
 - call `mdb_env_set_mapsize` after calling `mdb_env_create` and before `mdb_env_open`
 - we get `bt_ndata` stat in the BDB version even though we are using a BTree access method because it has stores the amount of records in the DB if it was set with `RECNO` access method
 - view snippets of the C API being used in this [repo](https://github.com/ahupowerdns/ahutils)
+- using `MDB_APPEND` will cause duplicate blocks to exist in your DB!
 
