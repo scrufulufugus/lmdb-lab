@@ -311,8 +311,16 @@ Handle BTTable::insert(const ValueDict *row) {
 // not required for Milestone 2
 void BTTable::update(const Handle handle, const ValueDict *new_values){};
 
-// not required for Milestone 2
-void BTTable::del(const Handle handle){};
+void BTTable::del(const Handle handle){
+	BlockID block_id = handle.first;
+	RecordID record_id = handle.second;
+	SlottedPage *block = this->file.get(block_id);
+	SlottedPage block_copy(*block);
+
+	block_copy.del(record_id);
+	this->file.put(&block_copy);
+	// delete block?
+};
 
 // Select all, return existing handles in this table
 Handles *BTTable::select() {
@@ -337,8 +345,11 @@ Handles *BTTable::select(const ValueDict *where) {
   for (auto const &block_id : *block_ids) {
     SlottedPage *block = file.get(block_id);
     RecordIDs *record_ids = block->ids();
-    for (auto const &record_id : *record_ids)
-      handles->push_back(Handle(block_id, record_id));
+    for (auto const &record_id : *record_ids) {
+		Handle handle(block_id, record_id);
+	    if (selected(handle, where))
+      		handles->push_back(Handle(block_id, record_id));
+	}
     delete record_ids;
     delete block;
   }
@@ -348,11 +359,7 @@ Handles *BTTable::select(const ValueDict *where) {
 
 // Display the row with the associated handle
 ValueDict *BTTable::project(Handle handle) {
-  BlockID block_id = handle.first;
-  RecordID record_id = handle.second;
-  SlottedPage *page = this->file.get(block_id);
-  ValueDict *row = unmarshal(page->get(record_id));
-  return row;
+  return this->project(handle, &this->column_names);
 };
 
 // Display the row with the associated handle and its column names
@@ -404,8 +411,17 @@ Handle BTTable::append(const ValueDict *row) {
   }
   page_copy.ids();
   this->file.put(&page_copy);
-  return {record_id, block_id};
+  return {block_id, record_id};
 };
+
+bool BTTable::selected(Handle handle, const ValueDict *where) {
+	if (where == nullptr)
+		return true;
+	ValueDict *row = this->project(handle, where);
+	bool is_selected = *row == *where;
+	delete row;
+	return is_selected;
+}
 
 MDB_val *BTTable::marshal(const ValueDict *row) {
   char *bytes =

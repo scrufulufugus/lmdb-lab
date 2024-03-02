@@ -150,6 +150,8 @@ public:
 
     virtual ValueDict *project(Handle handle, const ColumnNames *column_names);
 
+	using DbRelation::project;
+
 protected:
     BTFile file;
 
@@ -160,5 +162,7 @@ protected:
     virtual MDB_val *marshal(const ValueDict *row);
 
     virtual ValueDict *unmarshal(MDB_val *data);
+
+	virtual bool selected(Handle handle, const ValueDict *where);
 };
 
