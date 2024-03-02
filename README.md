@@ -20,6 +20,7 @@
 - lmdb uses B+ tree data structure
 	- which means we can only implement a BTree internal representation
 - lmdb does not want you to modify the memory inside `MDB_val`'s data
+	- copy the data and modify it, then put it into the DB.
 ### Minor Notes
 - call `mdb_env_set_mapsize` after calling `mdb_env_create` and before `mdb_env_open`
 - we get `bt_ndata` stat in the BDB version even though we are using a BTree access method because it has stores the amount of records in the DB if it was set with `RECNO` access method
