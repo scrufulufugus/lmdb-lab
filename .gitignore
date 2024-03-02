@@ -2,4 +2,7 @@ data/example.mdb/*.mdb
 to-move
 *.o
 test
-out
+lmdb-lab
+/result
+.direnv/
+compile_commands.json
