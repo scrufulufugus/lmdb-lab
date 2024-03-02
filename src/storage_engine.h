@@ -103,12 +103,16 @@ protected:
     std::string name;  // filename (or part of it)
 };
 
-
+/**
+ * @class ColumnAttribute - holds datatype and other info for a column
+ */
 class ColumnAttribute {
 public:
     enum DataType {
-        INT, TEXT
+        INT, TEXT, BOOLEAN
     };
+
+    ColumnAttribute() : data_type(INT) {}
 
     ColumnAttribute(DataType data_type) : data_type(data_type) {}
 
@@ -123,6 +127,9 @@ protected:
 };
 
 
+/**
+ * @class Value - holds value for a field
+ */
 class Value {
 public:
     ColumnAttribute::DataType data_type;
@@ -134,6 +141,10 @@ public:
     Value(int32_t n) : n(n) { data_type = ColumnAttribute::INT; }
 
     Value(std::string s) : n(0), s(s) { data_type = ColumnAttribute::TEXT; }
+
+    bool operator==(const Value &other) const;
+
+    bool operator!=(const Value &other) const;
 };
 
 // More type aliases
@@ -143,8 +154,11 @@ typedef std::vector<ColumnAttribute> ColumnAttributes;
 typedef std::pair<BlockID, RecordID> Handle;
 typedef std::vector<Handle> Handles;  // FIXME: will need to turn this into an iterator at some point
 typedef std::map<Identifier, Value> ValueDict;
+typedef std::vector<ValueDict *> ValueDicts;
 
-
+/**
+ * @class DbRelationError - generic exception class for DbRelation
+ */
 class DbRelationError : public std::runtime_error {
 public:
     explicit DbRelationError(std::string s) : runtime_error(s) {}
@@ -183,10 +197,11 @@ public:
 
     virtual ValueDict *project(Handle handle, const ColumnNames *column_names) = 0;
 
+	virtual ValueDict *project(Handle handle, const ValueDict *column_names);
+
 protected:
     Identifier table_name;
     ColumnNames column_names;
     ColumnAttributes column_attributes;
 };
-
 
