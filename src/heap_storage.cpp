@@ -62,9 +62,9 @@ void SlottedPage::put(RecordID record_id, const MDB_val &data) {
     // OLD: this->slide(loc + new_size, loc + size);
     this->slide(loc, loc - extra);
     // OLD: memmove(this->address(loc - extra), data.get_data(), new_size);
-    memmove(this->address(loc - extra), data.mv_data, (extra + size));
+    memcpy(this->address(loc - extra), data.mv_data, (extra + size));
   } else {
-    memmove(this->address(loc), data.mv_data, new_size);
+    memcpy(this->address(loc), data.mv_data, new_size);
     this->slide(loc + new_size, loc + size);
   }
   this->get_header(size, loc, record_id);
@@ -77,8 +77,8 @@ void SlottedPage::del(RecordID record_id) {
   u_int16_t loc;
 
   this->get_header(size, loc, record_id);
-  this->put_header(record_id, 0, 0);
   this->slide(loc, loc + size); // ?
+  this->put_header(record_id, 0, 0);
 }
 
 // Get existing record_ids in SlottedPage, make sure to deallocate
@@ -98,44 +98,35 @@ RecordIDs *SlottedPage::ids(void) {
 // protected
 // Check if SlottedPage has room
 bool SlottedPage::has_room(u_int16_t size) {
-  u_int16_t available = this->end_free - (this->num_records + 1) * 4;
+  u_int16_t available = this->end_free - (this->num_records + 2) * 4;
   return size <= available;
 };
 
-// Slide data left or right, and update the records
 void SlottedPage::slide(u_int16_t start, u_int16_t end) {
-  if (start == end)
-    return;
+    int shift = end - start;
+    if (shift == 0)
+        return;
 
-  int shift = end - start;
-  if (shift < 0) {
-    // means we are sliding data to the left because of addition
-    memmove(this->address(this->end_free + 1 + shift),
-            this->address(this->end_free + 1), abs(shift));
-  } else {
-    // means we are sliding data to the right because of a deletion
-    uint extra =
-        (DbBlock::BLOCK_SZ - end); // count extra bytes we don't want to remove
-    uint dist = (DbBlock::BLOCK_SZ - shift - extra) - (this->end_free + 1);
-    memmove(this->address(this->end_free + 1 + shift),
-            this->address(this->end_free + 1), dist);
-  }
+    // slide data
+    void *to = this->address((uint16_t) (this->end_free + 1 + shift));
+    void *from = this->address((uint16_t) (this->end_free + 1));
+    int bytes = start - (this->end_free + 1U);
+    memmove(to, from, bytes);
 
-  RecordIDs *record_ids = ids();
-  for (const RecordID &id : *record_ids) {
-    u_int16_t size;
-    u_int16_t loc;
-    this->get_header(size, loc, id);
-    if (loc <= start) // OLD: loc < end
-    {
-      loc += shift;
-      this->put_header(id, size, loc);
+    // fix up headers to the right
+    RecordIDs *record_ids = ids();
+    for (auto const &record_id : *record_ids) {
+        uint16_t size, loc;
+        get_header(size, loc, record_id);
+        if (loc <= start) {
+            loc += shift;
+            put_header(record_id, size, loc);
+        }
     }
-  }
-  this->end_free += shift;
-  this->put_header();
-  delete record_ids;
-};
+    delete record_ids;
+    this->end_free += shift;
+    put_header();
+}
 
 // Get 2-byte integer at given offset in block.
 u_int16_t SlottedPage::get_n(u_int16_t offset) {

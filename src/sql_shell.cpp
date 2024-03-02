@@ -52,7 +52,7 @@ void SQLShell::run() {
         if (query.length() == 0) continue;
         if (query == "quit") break;
 
-        SQLParserResult *parser_result = nullptr;
+        SQLParserResult *parser_result = new SQLParserResult();
 		bool is_valid = SQLParser::parseSQLString(query, parser_result);
 
         SQLExec *sql_exec = new SQLExec();
