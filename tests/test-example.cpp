@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <cstdio>
@@ -15,12 +16,13 @@ void remove_files(std::vector<std::string> file_names);
 class BTFixture : public ::testing::Test
 {
 protected:
+    std::string envdir;
     void SetUp() override
     {
-        const char *home = std::getenv("HOME");
 		// lmdb version
 		MDB_env *env;
-        std::string envdir = std::string(home) + "/Projects/lmdb-lab/data/example.mdb";
+		envdir = std::string(std::filesystem::temp_directory_path()) + "/lmdb-XXXXXX";
+		mkdtemp(envdir.data());
 		mdb_env_create(&env);
 		mdb_env_set_mapsize(env, 1UL * 1024UL * 1024UL * 1024UL); // 1Gb
 		mdb_env_set_maxdbs(env, 5);
@@ -32,12 +34,7 @@ protected:
     void TearDown() override
     {
         mdb_env_close(_MDB_ENV);
-		int res = std::system("rm -f ./data/example.mdb/*.mdb"); // remove the .db files in _MDB_ENV dir
-        if (res != 0)
-        {
-            std::cout << "\n!!! Failed to remove .mdb files in /data/example.mdb, manually remove it before running the test again !!!\n";
-        }
-        std::cout << "Removed .mdb files in ../data/example.mdb\n";
+        std::filesystem::remove_all(envdir);
     }
 };
 
