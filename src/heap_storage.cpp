@@ -175,7 +175,7 @@ void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id) {
 
 // Create a new block
 void BTFile::create(void) {
-  this->db_open(0);
+  this->db_open(MDB_CREATE);
   SlottedPage *block = this->get_new();
   this->put(block);
   delete block;
@@ -188,7 +188,7 @@ void BTFile::drop(void) {
 };
 
 // Open current file
-void BTFile::open(void) { this->db_open(); };
+void BTFile::open(void) { this->db_open(); }; // Create the named databse if it doesn't exist
 
 // Close current file
 void BTFile::close(void) {
@@ -269,10 +269,11 @@ void BTFile::db_open(uint flags) {
   mdb_txn_begin(_MDB_ENV, nullptr, 0, &txn);
 
   // open dbi
-  int status = mdb_dbi_open(txn, dbfilename.c_str(), MDB_CREATE | flags, &dbi);
+  int status = mdb_dbi_open(txn, dbfilename.c_str(), flags, &dbi);
 
   if (status) {
 		if (status == MDB_NOTFOUND) {
+			mdb_txn_abort(txn);
 			throw DbException(status, std::generic_category(), "FILE DOES NOT EXIST");
 		}
 	}
@@ -297,17 +298,12 @@ BTTable::BTTable(Identifier table_name, ColumnNames column_names,
 
 void BTTable::create() { this->file.create(); }
 
-void BTTable::create_if_not_exists() {
-  try {
-    this->open();
-  } catch (const DbException &e) {
-	int err = e.code().value();
-    if (err == MDB_NOTFOUND || err == 101) {
-      this->create();
-    } else {
-      throw e;
-    }
-  }
+void BTTable::create_if_not_exists() { 
+	try {
+		this->file.open(); 
+	} catch (DbException &e) {
+		this->file.create();
+	}
 }
 
 void BTTable::open() { this->file.open(); }

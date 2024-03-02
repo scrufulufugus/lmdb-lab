@@ -181,10 +181,7 @@ namespace
 	
 	TEST_F(BTFixture, BT_table_basics)
     {
-		printf("Entered BT_table test\n");
         remove_files({"_test_create_drop_cpp", "_test_data_cpp"});
-
-		printf("BT_table: removed files\n");
         // setup
         ColumnNames column_names;
         column_names.push_back("a");
@@ -194,7 +191,6 @@ namespace
         column_attributes.push_back(ca);
         ca.set_data_type(ColumnAttribute::TEXT);
         column_attributes.push_back(ca);
-		printf("BT_table: finish setup\n");
 
         // start testing
         BTTable table1("_test_create_drop_cpp", column_names, column_attributes);
@@ -203,7 +199,7 @@ namespace
 
         // restriction-- maybe want to fix this some day
         BTTable table("_test_data_cpp", column_names, column_attributes);
-        table.create();
+        table.create_if_not_exists();
 
         ValueDict row;
         row["a"] = Value(12);
@@ -212,11 +208,8 @@ namespace
         table.insert(&row);
 
         Handles *handles = table.select();
-		printf("select handles\n");
 		int size = handles->size();
-		printf("select handles size %d \n", size);
         ValueDict *result = table.project((*handles)[0]);
-		printf("select project the handles\n");
         Value value = (*result)["a"];
         ASSERT_EQ(value.n, 12);
         value = (*result)["b"];

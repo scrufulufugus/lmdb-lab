@@ -41,7 +41,6 @@ public:
     DbBlock(MDB_val &block, BlockID block_id, bool is_new = false) : block(block), block_id(block_id) {}
 
 	DbBlock(const DbBlock &other) {
-		printf("I get called, im copying\n");
 		block_id = other.block_id;
 		void *data = malloc(DbBlock::BLOCK_SZ);
 		memcpy(data, other.block.mv_data, other.block.mv_size);
