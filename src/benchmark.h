@@ -1,5 +1,4 @@
 #include "heap_storage.h"
-#include <lmdb.h>
 #include <vector>
 
 #include <chrono>
@@ -10,14 +9,14 @@ using TimePoint = std::chrono::steady_clock::time_point;
 using TimeSpan = std::chrono::duration<double>;
 
 // Define the types used in the benchmark
-typedef BTFile BenchFile;
+typedef HeapFile BenchFile;
 typedef SlottedPage BenchPage;
 
 class Benchmark {
 public:
     Benchmark() = delete;
 
-    static std::vector<MDB_val*> block_data;
+    static std::vector<Dbt*> block_data;
     static void run(std::string filename = "__benchmark.db");
 
     static TimeSpan read_test(BenchFile &file, size_t n);

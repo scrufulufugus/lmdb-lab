@@ -2,11 +2,10 @@
 #include "heap_storage.h"
 #include <cassert>
 #include <cstddef>
-#include <lmdb.h>
 #include <string>
 #include <vector>
 
-std::vector<MDB_val*> Benchmark::block_data;;
+std::vector<Dbt*> Benchmark::block_data;;
 
 void Benchmark::run(std::string filename) {
 
@@ -16,7 +15,7 @@ void Benchmark::run(std::string filename) {
     if (block_data.empty()) {
         std::string *data = new std::string("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
         for (size_t i = 0; i < 133; i++) {
-            block_data.push_back(new MDB_val(data->size(), (void *)data->c_str()));
+            block_data.push_back(new Dbt((void *)data->c_str(), data->size()));
         }
     }
     printf("n,type,seconds\n");
@@ -47,7 +46,7 @@ TimeSpan Benchmark::write_test(BenchFile &file, size_t n) {
     TimePoint start_time = steady_clock::now();
 
     for (BenchPage *page : *pages) {
-        for (const MDB_val *data : block_data) {
+        for (const Dbt *data : block_data) {
             page->add(data);
         }
     }
@@ -69,7 +68,7 @@ TimeSpan Benchmark::read_test(BenchFile &file, size_t n) {
     for (BenchPage *page : *pages) {
         RecordIDs *ids = page->ids();
         for (size_t i = 0; i < ids->size(); i++) {
-            MDB_val *data = page->get((*ids)[i]);
+            Dbt *data = page->get((*ids)[i]);
             // Assert that the data is the same as the data we put in
             assert(memcmp(data->mv_data, block_data[i]->mv_data, data->mv_size) == 0);
             delete data;
