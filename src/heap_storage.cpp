@@ -202,20 +202,23 @@ void HeapFile::create(void)
 // Drop this current file, remove the db file
 void HeapFile::drop(void)
 {
-    this->close();
+    if (!closed)
+        this->close();
     std::remove(this->dbfilename.c_str());
 };
 
 // Open current file
 void HeapFile::open(void)
 {
-    this->db_open();
+    if (closed)
+        this->db_open();
 };
 
 // Close current file
 void HeapFile::close(void)
 {
-    this->db.close(0);
+    if (!closed)
+        this->db.close(0);
     this->closed = true;
 };
 
