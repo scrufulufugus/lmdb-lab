@@ -1,14 +1,17 @@
 #include <cstdlib>
+#include <iostream>
 #include "heap_storage.h"
 #include "sql_shell.h"
 
-int main() {
+int main(int argc, char *argv[]) {
 
-  const char *home = std::getenv("HOME");
-  std::string env_dir =
-      std::string(home) + "/Projects/lmdb-lab/data/example.mdb";
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " dbenvpath" << std::endl;
+    return EXIT_FAILURE;
+  }
+
   SQLShell shell;
-  shell.init(env_dir.c_str());
+  shell.init(argv[1]);
   shell.run();
 
   return EXIT_SUCCESS;

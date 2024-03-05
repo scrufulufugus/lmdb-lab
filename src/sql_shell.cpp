@@ -8,6 +8,7 @@
 #include "sql_shell.h"
 #include "sql_exec.h"
 #include "heap_storage.h"
+#include "benchmark.h"
 
 #include <stdio.h>
 
@@ -51,6 +52,7 @@ void SQLShell::run() {
         getline(cin, query);
         if (query.length() == 0) continue;
         if (query == "quit") break;
+        if (query == "benchmark") Benchmark::run();
 
         SQLParserResult *parser_result = new SQLParserResult();
 		bool is_valid = SQLParser::parseSQLString(query, parser_result);
