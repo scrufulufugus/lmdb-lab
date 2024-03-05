@@ -16,6 +16,7 @@
 #include "db_cxx.h"
 #include "SQLParser.h" // parser
 #include "SQLRunner.h"
+#include <benchmark.h>
 
 #include "heap_storage.h"
 #include "storage_engine.h"
@@ -53,6 +54,9 @@ int main(int argc, char *argv[])
 		{
 			running = false;
 		}
+    else if (input == "benchmark") {
+      Benchmark::run();
+    }
 		else if (input == "test")
 		{
 			std::cout << "Testing..." << std::endl;
