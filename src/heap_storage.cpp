@@ -397,19 +397,17 @@ Handle BTTable::append(const ValueDict *row) {
   RecordID record_id;
   BlockID block_id = this->file.get_last_block_id();
   MDB_val *data = marshal(row); // row we want to insert
-								//
   SlottedPage *page = this->file.get(block_id); // we can't modify the block directly
   SlottedPage page_copy(*page);
 
-  page_copy.ids();
   try {
     record_id = page_copy.add(data);
-  } catch (const DbBlockNoRoomError &e) { // FIXME: implement me
+  } catch (const DbBlockNoRoomError &e) {
 	throw DbException(404, std::generic_category(), "BLOCK OVER FILL NOT IMPLEMENTED!");
     // page_copy = this->file.get_new(); 
     // record_id = page_copy.add(data);
   }
-  page_copy.ids();
+
   this->file.put(&page_copy);
   return {block_id, record_id};
 };
