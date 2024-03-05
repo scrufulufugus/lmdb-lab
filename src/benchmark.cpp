@@ -22,9 +22,7 @@ void Benchmark::run(std::string filename) {
 
     for (size_t i = 0; i < 5; i++) {
         file = new BenchFile(filename);
-        file->create();
         printf("%lu,write,%f\n", n[i], write_test(*file, n[i]).count());
-        file->close();
         delete file;
         file = new BenchFile(filename);
         file->open();
@@ -40,6 +38,7 @@ void Benchmark::run(std::string filename) {
 }
 
 TimeSpan Benchmark::write_test(BenchFile &file, size_t n) {
+    file.create();
     std::vector<BenchPage*> *pages = init_pages(file, n);
 
     // Begin benchmark
@@ -50,6 +49,7 @@ TimeSpan Benchmark::write_test(BenchFile &file, size_t n) {
             page->add(data);
         }
     }
+    file.close(); // We have to close inside the benchmark because db cheats
 
     // End benchmark
     TimePoint end_time = steady_clock::now();
@@ -60,17 +60,18 @@ TimeSpan Benchmark::write_test(BenchFile &file, size_t n) {
 }
 
 TimeSpan Benchmark::read_test(BenchFile &file, size_t n) {
-    std::vector<BenchPage*> *pages = init_pages(file, n);
-
     // Begin benchmark
     TimePoint start_time = steady_clock::now();
 
-    for (BenchPage *page : *pages) {
+    for (size_t j = 0; j < n; j++) {
+        BenchPage *page = file.get(j);
         RecordIDs *ids = page->ids();
         for (size_t i = 0; i < ids->size(); i++) {
             Dbt *data = page->get((*ids)[i]);
             // Assert that the data is the same as the data we put in
-            assert(memcmp(data->mv_data, block_data[i]->mv_data, data->mv_size) == 0);
+            if (memcmp(data->get_data(), block_data[i]->get_data(), data->get_size()) != 0) {
+              throw "Bad block";
+            }
             delete data;
         }
         delete ids;
@@ -79,7 +80,6 @@ TimeSpan Benchmark::read_test(BenchFile &file, size_t n) {
     // End benchmark
     TimePoint end_time = steady_clock::now();
 
-    free_pages(pages);
     TimeSpan span = duration_cast<TimeSpan>(end_time - start_time);
     return span;
 }
