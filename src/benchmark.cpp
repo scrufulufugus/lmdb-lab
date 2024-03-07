@@ -10,7 +10,7 @@ std::vector<MDB_val*> Benchmark::block_data;;
 
 void Benchmark::run(std::string filename) {
 
-    size_t n[] = {1000, 10000, 100000, 1000000, 10000000};
+    size_t n[] = {10000, 100000, 1000000, 2500000, 3000000};
     BenchFile *file;
 
     if (block_data.empty()) {
